@@ -1,0 +1,23 @@
+# Extension module: `cargo test -p cel-mapper-python` needs Python dev libraries on the linker path.
+# Omitted from workspace `default-members` so plain `cargo test` does not require libpython.
+[package]
+name = "cel-mapper-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# PyO3 `create_exception!` expands cfg from an older pyo3 pattern; harmless on current nightly check-cfg.
+[lints.rust]
+unexpected_cfgs = "allow"
+
+[lib]
+name = "cel_mapper"
+# cdylib only: `cargo test -p cel-mapper-python` has no Rust tests; use `pytest` after `maturin develop`.
+crate-type = ["cdylib"]
+
+[dependencies]
+cel-mapper-core = { path = "../cel-mapper-core" }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+pythonize = "0.22"
+serde_json = "1"
+serde_yaml = "0.9"

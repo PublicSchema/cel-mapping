@@ -1,0 +1,15 @@
+{
+  "__id": "h1",
+  "village": "  oak   lane  ",
+  "__system": {
+    "submissionDate": "2024-01-15T10:30:00Z"
+  },
+  "members": [
+    {
+      "name": "  john   doe  ",
+      "dob": "1990-05-20",
+      "sex": "m",
+      "phone": "6502530000"
+    }
+  ]
+}

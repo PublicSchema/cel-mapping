@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy -p cel-mapper-core -p cel-mapper-wasm --all-targets -- -D warnings
+      - run: cargo test -p cel-mapper-core -p cel-mapper-wasm
+
+  wasm-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: cd packages/js && npm ci && npm run build:wasm && npm run build:ts
+
+  maturin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: venv, editable install, pytest
+        run: |
+          python -m venv .venv-ci
+          export VIRTUAL_ENV="$PWD/.venv-ci"
+          export PATH="$VIRTUAL_ENV/bin:$PATH"
+          pip install "maturin>=1.5,<2" "pytest>=8"
+          maturin develop --release -m crates/cel-mapper-python/Cargo.toml
+          pytest -q crates/cel-mapper-python/tests
+          python crates/cel-mapper-python/examples/compile_once_evaluate_many.py
+          python crates/cel-mapper-python/examples/one_shot_evaluate.py
+          python crates/cel-mapper-python/examples/error_handling.py
+          python crates/cel-mapper-python/examples/register_code_system.py
+          python crates/cel-mapper-python/examples/evaluate_expression_only.py
+          python crates/cel-mapper-python/examples/expression_preview_editor.py
+      - name: release wheel (sanity)
+        run: |
+          export VIRTUAL_ENV="$PWD/.venv-ci"
+          export PATH="$VIRTUAL_ENV/bin:$PATH"
+          maturin build --release -m crates/cel-mapper-python/Cargo.toml

@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/cel-mapper-core",
+    "crates/cel-mapper-wasm",
+    "crates/cel-mapper-python",
+]
+# PyO3 links libpython; keep it out of the default graph so `cargo test` works without Python dev libs.
+default-members = [
+    "crates/cel-mapper-core",
+    "crates/cel-mapper-wasm",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/204-programs-delivery-commons"

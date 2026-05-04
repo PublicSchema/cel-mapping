@@ -1,0 +1,49 @@
+{
+  "name": "code-map-preloaded",
+  "mapping": {
+    "version": "0.2",
+    "id": "code-map-preloaded",
+    "code_systems": {
+      "odk.gender": {
+        "male": {
+          "id": "canonical.gender.male",
+          "label": { "en": "Male" },
+          "aliases": ["m", "man"]
+        },
+        "female": {
+          "id": "canonical.gender.female",
+          "label": { "en": "Female" },
+          "aliases": ["f", "woman"]
+        }
+      }
+    },
+    "property_mappings": [
+      {
+        "id": "gender",
+        "source": "/sex",
+        "target": "/gender",
+        "formula": {
+          "to_target": {
+            "expression": "code_map_or_default(\"odk.gender\", source, \"canonical.gender.unknown\")"
+          }
+        }
+      }
+    ]
+  },
+  "direction": "to_target",
+  "source_data": {
+    "sex": "female"
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": true,
+    "output": { "gender": "canonical.gender.female" },
+    "errors_count": 0,
+    "warnings_count": 0,
+    "log_statuses": ["applied"]
+  }
+}

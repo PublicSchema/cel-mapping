@@ -1,0 +1,30 @@
+{
+  "name": "identity-copy",
+  "mapping": {
+    "version": "0.2",
+    "id": "identity-copy",
+    "property_mappings": [
+      {
+        "id": "given-name",
+        "source": "/person/name",
+        "target": "/name/full"
+      }
+    ]
+  },
+  "direction": "to_target",
+  "source_data": {
+    "person": { "name": "Ada" }
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": true,
+    "output": { "name": { "full": "Ada" } },
+    "errors_count": 0,
+    "warnings_count": 0,
+    "log_statuses": ["applied"]
+  }
+}

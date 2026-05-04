@@ -1,0 +1,35 @@
+{
+  "name": "explicit-source-identity",
+  "mapping": {
+    "version": "0.2",
+    "id": "explicit-source-identity",
+    "property_mappings": [
+      {
+        "id": "gender",
+        "source": "/gender",
+        "target": "/sex",
+        "formula": {
+          "to_target": {
+            "expression": "source"
+          }
+        }
+      }
+    ]
+  },
+  "direction": "to_target",
+  "source_data": {
+    "gender": "female"
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": true,
+    "output": { "sex": "female" },
+    "errors_count": 0,
+    "warnings_count": 0,
+    "log_statuses": ["applied"]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "cel-mapping-js",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TypeScript helpers and wasm-pack build for cel-mapper-wasm (web target).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "wasm-pkg"
+  ],
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../crates/cel-mapper-wasm --target web --out-dir ../../packages/js/wasm-pkg",
+    "build:ts": "tsc -p tsconfig.json",
+    "build": "npm run build:wasm && npm run build:ts"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.3"
+  }
+}

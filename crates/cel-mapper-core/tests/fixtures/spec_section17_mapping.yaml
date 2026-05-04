@@ -1,0 +1,47 @@
+# Mirrors spec.md §17 (Example End-to-End Mapping).
+version: "0.1"
+name: odk_household_to_canonical
+source_system: odk
+target_model: canonical.household_bundle
+
+code_systems:
+  odk.gender:
+    male:
+      id: canonical.gender.male
+      label:
+        en: Male
+      aliases: ["m", "man"]
+    female:
+      id: canonical.gender.female
+      label:
+        en: Female
+      aliases: ["f", "woman"]
+
+records:
+  households:
+    emit: "present(source.__id)"
+    fields:
+      id: "id.make('household', source.__id)"
+      external_id: "source.__id"
+      village: "text.normalize_space(source.village)"
+      submitted_at: "date.parse_datetime(source.__system.submissionDate)"
+
+  people:
+    foreach: "source.members"
+    as: "member"
+    when: "present(member.name)"
+    fields:
+      id: "id.make('person', source.__id, index)"
+      household_id: "id.make('household', source.__id)"
+      name: "text.title(text.normalize_space(member.name))"
+      birth_date: "date.parse(member.dob, 'yyyy-MM-dd')"
+      age: "date.age_on(member.dob, ctx.today)"
+      gender: "code.map_or_default('odk.gender', member.sex, 'canonical.gender.unknown')"
+      phone: "phone.normalize(member.phone, ctx.country)"
+      is_minor: "date.age_on(member.dob, ctx.today) < 18"
+
+validations:
+  - expr: "present(source.__id)"
+    message: "Submission ID is required"
+  - expr: "source.members.size() > 0"
+    message: "At least one household member is required"
