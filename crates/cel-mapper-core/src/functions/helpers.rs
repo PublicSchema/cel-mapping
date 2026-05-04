@@ -56,7 +56,7 @@ pub fn require_present(v: &Value, msg: Option<String>) -> Result<Value, String> 
 }
 
 pub fn null_if_impl(v: &Value, m: &Value) -> Value {
-    if v == m {
+    if is_missing(v) || v == m {
         Value::Null
     } else {
         v.clone()

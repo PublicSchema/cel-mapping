@@ -59,3 +59,40 @@ fn date_parse_datetime_explicit_offset_format_uses_provided_offset() {
     .unwrap();
     assert_eq!(out, json!("2024-01-15T10:30:00+05:30"));
 }
+
+#[test]
+fn fixed_arity_1_rejects_extra_args() {
+    let rt = MappingRuntime::new(RuntimeOptions::default());
+    let err = eval("text_lower('hello', 'extra')", &rt).unwrap_err();
+    assert!(
+        err.to_string().contains("expected 1 argument"),
+        "expected arity error, got: {err}"
+    );
+}
+
+#[test]
+fn fixed_arity_2_rejects_extra_args() {
+    let rt = MappingRuntime::new(RuntimeOptions::default());
+    let err = eval("text_replace('hello', 'h', 'j', 'extra')", &rt).unwrap_err();
+    assert!(
+        err.to_string().contains("expected 3 arguments"),
+        "expected arity error, got: {err}"
+    );
+}
+
+#[test]
+fn num_parse_1_arg_parses_number() {
+    let rt = MappingRuntime::new(RuntimeOptions::default());
+    let out = eval("num_parse('42')", &rt).unwrap();
+    assert_eq!(out, serde_json::json!(42.0));
+}
+
+#[test]
+fn num_parse_2_arg_errors_with_arity_message() {
+    let rt = MappingRuntime::new(RuntimeOptions::default());
+    let err = eval("num_parse('3.14', 'en-US')", &rt).unwrap_err();
+    assert!(
+        err.to_string().contains("expected 1 argument"),
+        "expected arity error for 2-arg num_parse, got: {err}"
+    );
+}

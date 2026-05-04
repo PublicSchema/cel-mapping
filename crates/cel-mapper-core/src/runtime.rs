@@ -57,10 +57,12 @@ impl MappingRuntime {
     }
 
     pub fn new(options: RuntimeOptions) -> Self {
+        let mut code_systems = CodeSystemRegistry::new();
+        crate::iso_systems::load_iso_systems(&mut code_systems);
         Self {
             options,
             limits: SecurityLimits::default(),
-            code_systems: CodeSystemRegistry::new(),
+            code_systems,
         }
     }
 

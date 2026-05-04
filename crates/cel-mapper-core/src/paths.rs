@@ -14,6 +14,58 @@ static ATTR_PATH: Lazy<Regex> = Lazy::new(|| {
     .expect("regex")
 });
 
+/// Build the sentinel-injection path list from a set of compiled programs.
+///
+/// For each program, only paths that appear **exclusively** as arguments to
+/// missing-aware helpers are included.  Paths that appear in comparison,
+/// arithmetic, or any other strict context in **any** of the provided programs
+/// are excluded entirely — the strict context wins.
+///
+/// This replaces the regex-based `collect_dotted_paths` for the sentinel
+/// injection step at evaluation time.  The regex form is still used during
+/// compilation (expression inventory) where compiled programs are unavailable.
+pub fn collect_missing_aware_injection_paths(
+    programs: &[&cel::Program],
+) -> Vec<(String, Vec<String>)> {
+    let mut all_missing_aware: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+    let mut all_strict: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for prog in programs {
+        let (prog_missing_aware, prog_strict) =
+            crate::ast_paths::classify_all_paths(prog.expression());
+        all_missing_aware.extend(prog_missing_aware);
+        all_strict.extend(prog_strict);
+    }
+
+    // A path is safe to inject only when it is missing-aware and NOT strict.
+    all_missing_aware.retain(|p| !all_strict.contains(p));
+
+    dotted_strings_to_path_tuples(all_missing_aware)
+}
+
+/// Convert a set of `"root.seg1.seg2"` dotted strings to `(root, segs)` tuples.
+fn dotted_strings_to_path_tuples(
+    paths: std::collections::HashSet<String>,
+) -> Vec<(String, Vec<String>)> {
+    let mut out: Vec<(String, Vec<String>)> = paths
+        .into_iter()
+        .filter_map(|path| {
+            let mut parts = path.splitn(2, '.');
+            let root = parts.next()?.to_string();
+            let tail = parts.next()?;
+            let segs: Vec<String> = tail.split('.').map(|s| s.to_string()).collect();
+            if segs.is_empty() {
+                return None;
+            }
+            Some((root, segs))
+        })
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
 /// Paths whose root is one of `roots` (e.g. `item` / `member` for foreach rows).
 pub fn filter_paths_by_roots(
     paths: &[(String, Vec<String>)],

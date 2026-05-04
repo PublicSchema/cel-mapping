@@ -9,7 +9,7 @@ use crate::errors::{
 use crate::evaluator::{json_to_cel, run_program};
 use crate::missing::MISSING_STR;
 use crate::output::cel_to_json;
-use crate::paths::{augment_json_with_paths, collect_dotted_paths};
+use crate::paths::{augment_json_with_paths, collect_missing_aware_injection_paths};
 use crate::security::SecurityLimits;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
@@ -17,44 +17,29 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PublicSchemaBindingMode {
+    #[default]
     PublicSchemaV1,
     LegacyV01,
 }
 
-impl Default for PublicSchemaBindingMode {
-    fn default() -> Self {
-        Self::PublicSchemaV1
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PublicSchemaDirection {
+    #[default]
     ToTarget,
     FromTarget,
 }
 
-impl Default for PublicSchemaDirection {
-    fn default() -> Self {
-        Self::ToTarget
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivacyMode {
+    #[default]
     Production,
     Authoring,
     Debug,
-}
-
-impl Default for PrivacyMode {
-    fn default() -> Self {
-        Self::Production
-    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -703,7 +688,7 @@ fn eval_rule_expression(
     mapping: &CompiledPublicSchemaMapping,
     direction: PublicSchemaDirection,
 ) -> Result<JsonValue, String> {
-    let paths = collect_dotted_paths(std::slice::from_ref(&cel.source));
+    let paths = collect_missing_aware_injection_paths(&[&cel.program]);
     // Per spec §6.1: bind ONLY the direction-appropriate alias to the input record.
     // ToTarget (forward): `target` aliases root; `profile` is absent.
     // FromTarget (reverse): `profile` aliases root; `target` is absent.

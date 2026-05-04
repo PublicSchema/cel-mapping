@@ -88,6 +88,10 @@ impl CodeSystemRegistry {
         let ck = Self::normalize_code(canonical_value);
         t.reverse.get(&ck).cloned()
     }
+
+    pub fn has_system(&self, system: &str) -> bool {
+        self.systems.contains_key(system)
+    }
 }
 
 fn parse_code_system_yaml(raw: &serde_yaml::Value) -> Result<CodeSystemTable, CodeSystemError> {

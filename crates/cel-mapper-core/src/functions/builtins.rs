@@ -26,6 +26,13 @@ fn err_fn(name: &str, m: impl ToString) -> ExecutionError {
     ExecutionError::function_error(name, m)
 }
 
+fn arity_error(name: &str, expected: usize, got: usize) -> ExecutionError {
+    err_fn(
+        name,
+        format!("expected {expected} argument{s}, got {got}", s = if expected == 1 { "" } else { "s" }),
+    )
+}
+
 fn str_from(v: &Value) -> Result<String, ExecutionError> {
     value_as_str(v).map_err(|e| err_fn("str", e))
 }
@@ -42,9 +49,33 @@ fn icuish_to_chrono(pat: &str) -> String {
 
 pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     // --- 7.1 presence ---
-    ctx.add_function("present", |v: Value| present_value(&v));
-    ctx.add_function("missing", |v: Value| missing_value_bool(&v));
-    ctx.add_function("blank", |v: Value| blank_value(&v));
+    ctx.add_function(
+        "present",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("present", 1, args.len()));
+            }
+            Ok(present_value(&args[0]).into())
+        },
+    );
+    ctx.add_function(
+        "missing",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("missing", 1, args.len()));
+            }
+            Ok(missing_value_bool(&args[0]).into())
+        },
+    );
+    ctx.add_function(
+        "blank",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("blank", 1, args.len()));
+            }
+            Ok(blank_value(&args[0]).into())
+        },
+    );
     ctx.add_function(
         "coalesce",
         |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
@@ -54,7 +85,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "default",
-        |a: Value, b: Value| -> Result<Value, ExecutionError> { Ok(default_impl(&a, &b)) },
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("default", 2, args.len()));
+            }
+            Ok(default_impl(&args[0], &args[1]))
+        },
     );
     ctx.add_function(
         "require",
@@ -70,135 +106,253 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "null_if",
-        |a: Value, b: Value| -> Result<Value, ExecutionError> { Ok(null_if_impl(&a, &b)) },
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("null_if", 2, args.len()));
+            }
+            Ok(null_if_impl(&args[0], &args[1]))
+        },
     );
     ctx.add_function(
         "null_if_blank",
-        |v: Value| -> Result<Value, ExecutionError> { Ok(null_if_blank_impl(&v)) },
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("null_if_blank", 1, args.len()));
+            }
+            Ok(null_if_blank_impl(&args[0]))
+        },
     );
 
     // --- 7.2 type ---
-    ctx.add_function("type_string", |v: Value| -> Result<Value, ExecutionError> {
-        Ok(Value::String(Arc::new(str_from(&v)?)))
-    });
-    ctx.add_function("type_int", |v: Value| -> Result<Value, ExecutionError> {
-        if is_missing(&v) || matches!(v, Value::Null) {
-            return Err(err_fn("type_int", "cannot parse null/missing as int"));
-        }
-        match v {
-            Value::Int(i) => Ok(Value::Int(i)),
-            Value::UInt(u) => i64::try_from(u)
-                .map(Value::Int)
-                .map_err(|_| err_fn("type_int", "integer overflow")),
-            Value::Float(f) => {
-                const I64_MAX_PLUS_ONE_AS_F64: f64 = 9_223_372_036_854_775_808.0;
-                if !f.is_finite() {
-                    return Err(err_fn("type_int", "non-finite float"));
-                }
-                if f.trunc() != f {
-                    return Err(err_fn("type_int", "float must be integral"));
-                }
-                if f < i64::MIN as f64 || f >= I64_MAX_PLUS_ONE_AS_F64 {
-                    return Err(err_fn("type_int", "integer overflow"));
-                }
-                Ok(Value::Int(f as i64))
+    ctx.add_function(
+        "type_string",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_string", 1, args.len()));
             }
-            Value::String(s) => s
-                .trim()
-                .parse::<i64>()
-                .map(Value::Int)
-                .map_err(|e| err_fn("type_int", e)),
-            Value::Bool(b) => Ok(Value::Int(if b { 1 } else { 0 })),
-            _ => Err(err_fn("type_int", "unsupported type")),
-        }
-    });
-    ctx.add_function("type_float", |v: Value| -> Result<Value, ExecutionError> {
-        if is_missing(&v) || matches!(v, Value::Null) {
-            return Err(err_fn("type_float", "cannot parse null/missing"));
-        }
-        match v {
-            Value::Float(f) => Ok(Value::Float(f)),
-            Value::Int(i) => Ok(Value::Float(i as f64)),
-            Value::UInt(u) => Ok(Value::Float(u as f64)),
-            Value::String(s) => s
-                .trim()
-                .parse::<f64>()
-                .map(Value::Float)
-                .map_err(|e| err_fn("type_float", e)),
-            _ => Err(err_fn("type_float", "unsupported type")),
-        }
-    });
-    ctx.add_function("type_bool", |v: Value| -> Result<Value, ExecutionError> {
-        if is_missing(&v) || matches!(v, Value::Null) {
-            return Err(err_fn("type_bool", "cannot parse null/missing"));
-        }
-        match v {
-            Value::Bool(b) => Ok(Value::Bool(b)),
-            Value::Int(i) => Ok(Value::Bool(i != 0)),
-            Value::UInt(u) => Ok(Value::Bool(u != 0)),
-            Value::String(s) => {
-                let t = s.trim().to_ascii_lowercase();
-                Ok(Value::Bool(match t.as_str() {
-                    "true" | "yes" | "y" | "1" => true,
-                    "false" | "no" | "n" | "0" => false,
-                    _ => return Err(err_fn("type_bool", "invalid bool string")),
-                }))
+            Ok(Value::String(Arc::new(str_from(&args[0])?)))
+        },
+    );
+    ctx.add_function(
+        "type_int",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_int", 1, args.len()));
             }
-            _ => Err(err_fn("type_bool", "unsupported type")),
-        }
-    });
-    ctx.add_function("type_list", |v: Value| -> Result<Value, ExecutionError> {
-        if is_missing(&v) || matches!(v, Value::Null) {
-            return Ok(Value::List(Arc::new(vec![])));
-        }
-        Ok(match v {
-            Value::List(l) => Value::List(l.clone()),
-            other => Value::List(Arc::new(vec![other.clone()])),
-        })
-    });
-    ctx.add_function("type_map", |v: Value| -> Result<Value, ExecutionError> {
-        match v {
-            Value::Map(m) => Ok(Value::Map(m.clone())),
-            _ => Err(err_fn("type_map", "not a map")),
-        }
-    });
-    ctx.add_function("type_is_string", |v: Value| matches!(v, Value::String(_)));
-    ctx.add_function("type_is_number", |v: Value| {
-        matches!(v, Value::Int(_) | Value::UInt(_) | Value::Float(_))
-    });
-    ctx.add_function("type_is_bool", |v: Value| matches!(v, Value::Bool(_)));
-    ctx.add_function("type_is_list", |v: Value| matches!(v, Value::List(_)));
-    ctx.add_function("type_is_map", |v: Value| matches!(v, Value::Map(_)));
+            let v = args[0].clone();
+            if is_missing(&v) || matches!(v, Value::Null) {
+                return Err(err_fn("type_int", "cannot parse null/missing as int"));
+            }
+            match v {
+                Value::Int(i) => Ok(Value::Int(i)),
+                Value::UInt(u) => i64::try_from(u)
+                    .map(Value::Int)
+                    .map_err(|_| err_fn("type_int", "integer overflow")),
+                Value::Float(f) => {
+                    const I64_MAX_PLUS_ONE_AS_F64: f64 = 9_223_372_036_854_775_808.0;
+                    if !f.is_finite() {
+                        return Err(err_fn("type_int", "non-finite float"));
+                    }
+                    if f.trunc() != f {
+                        return Err(err_fn("type_int", "float must be integral"));
+                    }
+                    if f < i64::MIN as f64 || f >= I64_MAX_PLUS_ONE_AS_F64 {
+                        return Err(err_fn("type_int", "integer overflow"));
+                    }
+                    Ok(Value::Int(f as i64))
+                }
+                Value::String(s) => s
+                    .trim()
+                    .parse::<i64>()
+                    .map(Value::Int)
+                    .map_err(|e| err_fn("type_int", e)),
+                Value::Bool(b) => Ok(Value::Int(if b { 1 } else { 0 })),
+                _ => Err(err_fn("type_int", "unsupported type")),
+            }
+        },
+    );
+    ctx.add_function(
+        "type_float",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_float", 1, args.len()));
+            }
+            let v = args[0].clone();
+            if is_missing(&v) || matches!(v, Value::Null) {
+                return Err(err_fn("type_float", "cannot parse null/missing"));
+            }
+            match v {
+                Value::Float(f) => Ok(Value::Float(f)),
+                Value::Int(i) => Ok(Value::Float(i as f64)),
+                Value::UInt(u) => Ok(Value::Float(u as f64)),
+                Value::String(s) => s
+                    .trim()
+                    .parse::<f64>()
+                    .map(Value::Float)
+                    .map_err(|e| err_fn("type_float", e)),
+                _ => Err(err_fn("type_float", "unsupported type")),
+            }
+        },
+    );
+    ctx.add_function(
+        "type_bool",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_bool", 1, args.len()));
+            }
+            let v = args[0].clone();
+            if is_missing(&v) || matches!(v, Value::Null) {
+                return Err(err_fn("type_bool", "cannot parse null/missing"));
+            }
+            match v {
+                Value::Bool(b) => Ok(Value::Bool(b)),
+                Value::Int(i) => Ok(Value::Bool(i != 0)),
+                Value::UInt(u) => Ok(Value::Bool(u != 0)),
+                Value::String(s) => {
+                    let t = s.trim().to_ascii_lowercase();
+                    Ok(Value::Bool(match t.as_str() {
+                        "true" | "yes" | "y" | "1" => true,
+                        "false" | "no" | "n" | "0" => false,
+                        _ => return Err(err_fn("type_bool", "invalid bool string")),
+                    }))
+                }
+                _ => Err(err_fn("type_bool", "unsupported type")),
+            }
+        },
+    );
+    ctx.add_function(
+        "type_list",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_list", 1, args.len()));
+            }
+            let v = args[0].clone();
+            if is_missing(&v) || matches!(v, Value::Null) {
+                return Ok(Value::List(Arc::new(vec![])));
+            }
+            Ok(match v {
+                Value::List(l) => Value::List(l.clone()),
+                other => Value::List(Arc::new(vec![other.clone()])),
+            })
+        },
+    );
+    ctx.add_function(
+        "type_map",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_map", 1, args.len()));
+            }
+            match args[0].clone() {
+                Value::Map(m) => Ok(Value::Map(m.clone())),
+                _ => Err(err_fn("type_map", "not a map")),
+            }
+        },
+    );
+    ctx.add_function(
+        "type_is_string",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_is_string", 1, args.len()));
+            }
+            Ok(matches!(args[0], Value::String(_)))
+        },
+    );
+    ctx.add_function(
+        "type_is_number",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_is_number", 1, args.len()));
+            }
+            Ok(matches!(
+                args[0],
+                Value::Int(_) | Value::UInt(_) | Value::Float(_)
+            ))
+        },
+    );
+    ctx.add_function(
+        "type_is_bool",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_is_bool", 1, args.len()));
+            }
+            Ok(matches!(args[0], Value::Bool(_)))
+        },
+    );
+    ctx.add_function(
+        "type_is_list",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_is_list", 1, args.len()));
+            }
+            Ok(matches!(args[0], Value::List(_)))
+        },
+    );
+    ctx.add_function(
+        "type_is_map",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("type_is_map", 1, args.len()));
+            }
+            Ok(matches!(args[0], Value::Map(_)))
+        },
+    );
 
     // --- 7.3 text ---
-    ctx.add_function("text_trim", |v: Value| -> Result<Value, ExecutionError> {
-        Ok(Value::String(Arc::new(str_from(&v)?.trim().to_string())))
-    });
-    ctx.add_function("text_lower", |v: Value| -> Result<Value, ExecutionError> {
-        Ok(Value::String(Arc::new(str_from(&v)?.to_ascii_lowercase())))
-    });
-    ctx.add_function("text_upper", |v: Value| -> Result<Value, ExecutionError> {
-        Ok(Value::String(Arc::new(str_from(&v)?.to_ascii_uppercase())))
-    });
-    ctx.add_function("text_title", |v: Value| -> Result<Value, ExecutionError> {
-        let s = str_from(&v)?;
-        let t: String = s
-            .split_whitespace()
-            .map(|w| {
-                let mut c = w.chars();
-                match c.next() {
-                    None => String::new(),
-                    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
-        Ok(Value::String(Arc::new(t)))
-    });
+    ctx.add_function(
+        "text_trim",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("text_trim", 1, args.len()));
+            }
+            Ok(Value::String(Arc::new(str_from(&args[0])?.trim().to_string())))
+        },
+    );
+    ctx.add_function(
+        "text_lower",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("text_lower", 1, args.len()));
+            }
+            Ok(Value::String(Arc::new(str_from(&args[0])?.to_ascii_lowercase())))
+        },
+    );
+    ctx.add_function(
+        "text_upper",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("text_upper", 1, args.len()));
+            }
+            Ok(Value::String(Arc::new(str_from(&args[0])?.to_ascii_uppercase())))
+        },
+    );
+    ctx.add_function(
+        "text_title",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("text_title", 1, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let t: String = s
+                .split_whitespace()
+                .map(|w| {
+                    let mut c = w.chars();
+                    match c.next() {
+                        None => String::new(),
+                        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            Ok(Value::String(Arc::new(t)))
+        },
+    );
     ctx.add_function(
         "text_normalize_space",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("text_normalize_space", 1, args.len()));
+            }
+            let s = str_from(&args[0])?;
             Ok(Value::String(Arc::new(
                 s.split_whitespace().collect::<Vec<_>>().join(" "),
             )))
@@ -206,8 +360,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "text_remove_accents",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("text_remove_accents", 1, args.len()));
+            }
+            let s = str_from(&args[0])?;
             let d: String = s
                 .nfd()
                 .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
@@ -215,24 +372,33 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             Ok(Value::String(Arc::new(d)))
         },
     );
-    ctx.add_function("text_slug", |v: Value| -> Result<Value, ExecutionError> {
-        let s = str_from(&v)?.to_ascii_lowercase();
-        let slug: String = s
-            .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-            .collect::<String>()
-            .split('-')
-            .filter(|p| !p.is_empty())
-            .collect::<Vec<_>>()
-            .join("-");
-        Ok(Value::String(Arc::new(slug)))
-    });
+    ctx.add_function(
+        "text_slug",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("text_slug", 1, args.len()));
+            }
+            let s = str_from(&args[0])?.to_ascii_lowercase();
+            let slug: String = s
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                .collect::<String>()
+                .split('-')
+                .filter(|p| !p.is_empty())
+                .collect::<Vec<_>>()
+                .join("-");
+            Ok(Value::String(Arc::new(slug)))
+        },
+    );
     ctx.add_function(
         "text_replace",
-        |v: Value, from: Value, to: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
-            let a = str_from(&from)?;
-            let b = str_from(&to)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 3 {
+                return Err(arity_error("text_replace", 3, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let a = str_from(&args[1])?;
+            let b = str_from(&args[2])?;
             let out = s.replace(&a, &b);
             budget::enforce_max_string_bytes(out.len())?;
             Ok(Value::String(Arc::new(out)))
@@ -240,10 +406,13 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "text_regex_replace",
-        |v: Value, pat: Value, rep: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
-            let p = str_from(&pat)?;
-            let r = str_from(&rep)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 3 {
+                return Err(arity_error("text_regex_replace", 3, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let p = str_from(&args[1])?;
+            let r = str_from(&args[2])?;
             let re = Regex::new(&p).map_err(|e| err_fn("text_regex_replace", e))?;
             let out = re.replace_all(&s, r.as_str()).to_string();
             budget::enforce_max_string_bytes(out.len())?;
@@ -252,18 +421,24 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "text_matches",
-        |v: Value, pat: Value| -> Result<bool, ExecutionError> {
-            let s = str_from(&v)?;
-            let p = str_from(&pat)?;
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("text_matches", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let p = str_from(&args[1])?;
             let re = Regex::new(&p).map_err(|e| err_fn("text_matches", e))?;
             Ok(re.is_match(&s))
         },
     );
     ctx.add_function(
         "text_split",
-        |v: Value, sep: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
-            let d = str_from(&sep)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("text_split", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let d = str_from(&args[1])?;
             let parts: Vec<Value> = s
                 .split(&d)
                 .map(|x| Value::String(Arc::new(x.to_string())))
@@ -274,13 +449,16 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "text_join",
-        |parts: Value, sep: Value| -> Result<Value, ExecutionError> {
-            let list = match &parts {
-                Value::List(l) => l.as_ref(),
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("text_join", 2, args.len()));
+            }
+            let list = match &args[0] {
+                Value::List(l) => l.as_ref().clone(),
                 _ => return Err(err_fn("text_join", "expected list")),
             };
             budget::enforce_max_list_len(list.len())?;
-            let d = str_from(&sep)?;
+            let d = str_from(&args[1])?;
             let mut out = String::new();
             for (i, x) in list.iter().enumerate() {
                 if i > 0 {
@@ -294,17 +472,31 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "text_left",
-        |v: Value, n: i64| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
-            let n = usize::try_from(n.max(0)).unwrap_or(0);
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("text_left", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let n = match &args[1] {
+                Value::Int(i) => usize::try_from((*i).max(0)).unwrap_or(0),
+                Value::UInt(u) => *u as usize,
+                _ => return Err(err_fn("text_left", "second argument must be an integer")),
+            };
             Ok(Value::String(Arc::new(s.chars().take(n).collect())))
         },
     );
     ctx.add_function(
         "text_right",
-        |v: Value, n: i64| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
-            let n = usize::try_from(n.max(0)).unwrap_or(0);
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("text_right", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let n = match &args[1] {
+                Value::Int(i) => usize::try_from((*i).max(0)).unwrap_or(0),
+                Value::UInt(u) => *u as usize,
+                _ => return Err(err_fn("text_right", "second argument must be an integer")),
+            };
             let len = s.chars().count();
             let skip = len.saturating_sub(n);
             Ok(Value::String(Arc::new(s.chars().skip(skip).collect())))
@@ -333,34 +525,56 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             Ok(Value::String(Arc::new(slice.iter().collect())))
         },
     );
-    ctx.add_function("text_length", |v: Value| -> Result<i64, ExecutionError> {
-        Ok(str_from(&v)?.chars().count() as i64)
-    });
+    ctx.add_function(
+        "text_length",
+        |Arguments(args): Arguments| -> Result<i64, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("text_length", 1, args.len()));
+            }
+            Ok(str_from(&args[0])?.chars().count() as i64)
+        },
+    );
     ctx.add_function(
         "text_contains",
-        |v: Value, n: Value| -> Result<bool, ExecutionError> {
-            Ok(str_from(&v)?.contains(&str_from(&n)?))
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("text_contains", 2, args.len()));
+            }
+            Ok(str_from(&args[0])?.contains(&str_from(&args[1])?))
         },
     );
     ctx.add_function(
         "text_starts_with",
-        |v: Value, p: Value| -> Result<bool, ExecutionError> {
-            Ok(str_from(&v)?.starts_with(&str_from(&p)?))
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("text_starts_with", 2, args.len()));
+            }
+            Ok(str_from(&args[0])?.starts_with(&str_from(&args[1])?))
         },
     );
     ctx.add_function(
         "text_ends_with",
-        |v: Value, p: Value| -> Result<bool, ExecutionError> {
-            Ok(str_from(&v)?.ends_with(&str_from(&p)?))
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("text_ends_with", 2, args.len()));
+            }
+            Ok(str_from(&args[0])?.ends_with(&str_from(&args[1])?))
         },
     );
     ctx.add_function(
         "text_regex_extract",
-        |v: Value, pat: Value, group: i64| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
-            let p = str_from(&pat)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 3 {
+                return Err(arity_error("text_regex_extract", 3, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let p = str_from(&args[1])?;
             let re = Regex::new(&p).map_err(|e| err_fn("text_regex_extract", e))?;
-            let g = usize::try_from(group.max(0)).unwrap_or(0);
+            let g = match &args[2] {
+                Value::Int(i) => usize::try_from((*i).max(0)).unwrap_or(0),
+                Value::UInt(u) => *u as usize,
+                _ => return Err(err_fn("text_regex_extract", "third argument must be an integer")),
+            };
             match re.captures(&s) {
                 None => Ok(Value::String(Arc::new(String::new()))),
                 Some(caps) => {
@@ -377,65 +591,77 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     // --- 7.4 name ---
     ctx.add_function(
         "name_full",
-        |given: Value, family: Value| -> Result<Value, ExecutionError> {
-            let g = str_from(&given)?.trim().to_string();
-            let f = str_from(&family)?.trim().to_string();
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("name_full", 2, args.len()));
+            }
+            let g = str_from(&args[0])?.trim().to_string();
+            let f = str_from(&args[1])?.trim().to_string();
             let full = format!("{g} {f}").trim().to_string();
             Ok(Value::String(Arc::new(full)))
         },
     );
-    ctx.add_function("name_parts", |v: Value| -> Result<Value, ExecutionError> {
-        use cel::objects::{Key, Map};
-        use std::collections::HashMap;
-        let s = str_from(&v)?;
-        let parts: Vec<&str> = s.split_whitespace().collect();
-        let mut hm: HashMap<Key, Value> = HashMap::from([
-            (Key::String(Arc::new("given".into())), Value::Null),
-            (Key::String(Arc::new("middle".into())), Value::Null),
-            (Key::String(Arc::new("family".into())), Value::Null),
-        ]);
-        match parts.len() {
-            0 => {}
-            1 => {
-                hm.insert(
-                    Key::String(Arc::new("given".into())),
-                    Value::String(Arc::new(parts[0].to_string())),
-                );
+    ctx.add_function(
+        "name_parts",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            use cel::objects::{Key, Map};
+            use std::collections::HashMap;
+            if args.len() != 1 {
+                return Err(arity_error("name_parts", 1, args.len()));
             }
-            2 => {
-                hm.insert(
-                    Key::String(Arc::new("given".into())),
-                    Value::String(Arc::new(parts[0].to_string())),
-                );
-                hm.insert(
-                    Key::String(Arc::new("family".into())),
-                    Value::String(Arc::new(parts[1].to_string())),
-                );
-            }
-            _ => {
-                hm.insert(
-                    Key::String(Arc::new("given".into())),
-                    Value::String(Arc::new(parts[0].to_string())),
-                );
-                hm.insert(
-                    Key::String(Arc::new("family".into())),
-                    Value::String(Arc::new(parts[parts.len() - 1].to_string())),
-                );
-                let mid = parts[1..parts.len() - 1].join(" ");
-                if !mid.is_empty() {
+            let s = str_from(&args[0])?;
+            let parts: Vec<&str> = s.split_whitespace().collect();
+            let mut hm: HashMap<Key, Value> = HashMap::from([
+                (Key::String(Arc::new("given".into())), Value::Null),
+                (Key::String(Arc::new("middle".into())), Value::Null),
+                (Key::String(Arc::new("family".into())), Value::Null),
+            ]);
+            match parts.len() {
+                0 => {}
+                1 => {
                     hm.insert(
-                        Key::String(Arc::new("middle".into())),
-                        Value::String(Arc::new(mid)),
+                        Key::String(Arc::new("given".into())),
+                        Value::String(Arc::new(parts[0].to_string())),
                     );
                 }
+                2 => {
+                    hm.insert(
+                        Key::String(Arc::new("given".into())),
+                        Value::String(Arc::new(parts[0].to_string())),
+                    );
+                    hm.insert(
+                        Key::String(Arc::new("family".into())),
+                        Value::String(Arc::new(parts[1].to_string())),
+                    );
+                }
+                _ => {
+                    hm.insert(
+                        Key::String(Arc::new("given".into())),
+                        Value::String(Arc::new(parts[0].to_string())),
+                    );
+                    hm.insert(
+                        Key::String(Arc::new("family".into())),
+                        Value::String(Arc::new(parts[parts.len() - 1].to_string())),
+                    );
+                    let mid = parts[1..parts.len() - 1].join(" ");
+                    if !mid.is_empty() {
+                        hm.insert(
+                            Key::String(Arc::new("middle".into())),
+                            Value::String(Arc::new(mid)),
+                        );
+                    }
+                }
             }
-        }
-        Ok(Value::Map(Map { map: Arc::new(hm) }))
-    });
+            Ok(Value::Map(Map { map: Arc::new(hm) }))
+        },
+    );
     ctx.add_function(
         "name_initials",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("name_initials", 1, args.len()));
+            }
+            let s = str_from(&args[0])?;
             let ini: String = s
                 .split_whitespace()
                 .filter_map(|w| w.chars().next())
@@ -521,9 +747,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "date_format",
-        |v: Value, fmt: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
-            let pat = str_from(&fmt)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_format", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let pat = str_from(&args[1])?;
             let ch = icuish_to_chrono(&pat);
             if let Ok(nd) = NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
                 return Ok(Value::String(Arc::new(nd.format(&ch).to_string())));
@@ -533,18 +762,27 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             Ok(Value::String(Arc::new(dt.format(&ch).to_string())))
         },
     );
-    ctx.add_function("date_today", || -> Result<Value, ExecutionError> {
-        let t = eval_ctx_get(&["today"])
-            .and_then(|x| x.as_str().map(|s| s.to_string()))
-            .ok_or_else(|| err_fn("date_today", "ctx.today not set"))?;
-        Ok(Value::String(Arc::new(t)))
-    });
+    ctx.add_function(
+        "date_today",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if !args.is_empty() {
+                return Err(arity_error("date_today", 0, args.len()));
+            }
+            let t = eval_ctx_get(&["today"])
+                .and_then(|x| x.as_str().map(|s| s.to_string()))
+                .ok_or_else(|| err_fn("date_today", "ctx.today not set"))?;
+            Ok(Value::String(Arc::new(t)))
+        },
+    );
     ctx.add_function(
         "date_age_on",
-        |birth: Value, refd: Value| -> Result<i64, ExecutionError> {
-            let b = NaiveDate::parse_from_str(&str_from(&birth)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<i64, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_age_on", 2, args.len()));
+            }
+            let b = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_age_on", e))?;
-            let r = NaiveDate::parse_from_str(&str_from(&refd)?, "%Y-%m-%d")
+            let r = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_age_on", e))?;
             let age = r.year()
                 - b.year()
@@ -558,23 +796,39 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "date_years_between",
-        |a: Value, b: Value| -> Result<i64, ExecutionError> { years_between_dates(&a, &b) },
+        |Arguments(args): Arguments| -> Result<i64, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_years_between", 2, args.len()));
+            }
+            years_between_dates(&args[0], &args[1])
+        },
     );
     ctx.add_function(
         "date_days_between",
-        |a: Value, b: Value| -> Result<i64, ExecutionError> {
-            let da = NaiveDate::parse_from_str(&str_from(&a)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<i64, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_days_between", 2, args.len()));
+            }
+            let da = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_days_between", e))?;
-            let db = NaiveDate::parse_from_str(&str_from(&b)?, "%Y-%m-%d")
+            let db = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_days_between", e))?;
             Ok(db.signed_duration_since(da).num_days())
         },
     );
     ctx.add_function(
         "date_add_days",
-        |d: Value, days: i64| -> Result<Value, ExecutionError> {
-            let nd = NaiveDate::parse_from_str(&str_from(&d)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_add_days", 2, args.len()));
+            }
+            let nd = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_add_days", e))?;
+            let days = match &args[1] {
+                Value::Int(i) => *i,
+                Value::UInt(u) => *u as i64,
+                _ => return Err(err_fn("date_add_days", "second argument must be an integer")),
+            };
             let out = nd
                 .checked_add_signed(Duration::days(days))
                 .ok_or_else(|| err_fn("date_add_days", "overflow"))?;
@@ -583,9 +837,17 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "date_add_months",
-        |d: Value, months: i64| -> Result<Value, ExecutionError> {
-            let nd = NaiveDate::parse_from_str(&str_from(&d)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_add_months", 2, args.len()));
+            }
+            let nd = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_add_months", e))?;
+            let months = match &args[1] {
+                Value::Int(i) => *i,
+                Value::UInt(u) => *u as i64,
+                _ => return Err(err_fn("date_add_months", "second argument must be an integer")),
+            };
             let out =
                 add_months_safe(nd, months).ok_or_else(|| err_fn("date_add_months", "overflow"))?;
             Ok(Value::String(Arc::new(out.format("%Y-%m-%d").to_string())))
@@ -593,8 +855,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "date_start_of_month",
-        |d: Value| -> Result<Value, ExecutionError> {
-            let nd = NaiveDate::parse_from_str(&str_from(&d)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("date_start_of_month", 1, args.len()));
+            }
+            let nd = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_start_of_month", e))?;
             let out = nd.with_day(1).unwrap();
             Ok(Value::String(Arc::new(out.format("%Y-%m-%d").to_string())))
@@ -602,8 +867,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "date_end_of_month",
-        |d: Value| -> Result<Value, ExecutionError> {
-            let nd = NaiveDate::parse_from_str(&str_from(&d)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("date_end_of_month", 1, args.len()));
+            }
+            let nd = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_end_of_month", e))?;
             let (ny, nm) = if nd.month() == 12 {
                 (nd.year() + 1, 1)
@@ -616,42 +884,40 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
         },
     );
     ctx.add_function(
-        "date_is_valid",
-        |v: Value, fmt: Value| -> Result<bool, ExecutionError> {
-            let s = str_from(&v)?;
-            if !matches!(fmt, Value::Null) && !is_missing(&fmt) {
-                let ch = icuish_to_chrono(&str_from(&fmt)?);
-                return Ok(NaiveDate::parse_from_str(&s, &ch).is_ok());
-            }
-            Ok(NaiveDate::parse_from_str(&s, "%Y-%m-%d").is_ok())
-        },
-    );
-    ctx.add_function(
         "date_is_before",
-        |a: Value, b: Value| -> Result<bool, ExecutionError> {
-            let da = NaiveDate::parse_from_str(&str_from(&a)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_is_before", 2, args.len()));
+            }
+            let da = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_is_before", e))?;
-            let db = NaiveDate::parse_from_str(&str_from(&b)?, "%Y-%m-%d")
+            let db = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_is_before", e))?;
             Ok(da < db)
         },
     );
     ctx.add_function(
         "date_is_after",
-        |a: Value, b: Value| -> Result<bool, ExecutionError> {
-            let da = NaiveDate::parse_from_str(&str_from(&a)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_is_after", 2, args.len()));
+            }
+            let da = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_is_after", e))?;
-            let db = NaiveDate::parse_from_str(&str_from(&b)?, "%Y-%m-%d")
+            let db = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_is_after", e))?;
             Ok(da > db)
         },
     );
     ctx.add_function(
         "date_min",
-        |a: Value, b: Value| -> Result<Value, ExecutionError> {
-            let da = NaiveDate::parse_from_str(&str_from(&a)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_min", 2, args.len()));
+            }
+            let da = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_min", e))?;
-            let db = NaiveDate::parse_from_str(&str_from(&b)?, "%Y-%m-%d")
+            let db = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_min", e))?;
             Ok(Value::String(Arc::new(if da <= db {
                 da.format("%Y-%m-%d").to_string()
@@ -662,10 +928,13 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "date_max",
-        |a: Value, b: Value| -> Result<Value, ExecutionError> {
-            let da = NaiveDate::parse_from_str(&str_from(&a)?, "%Y-%m-%d")
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("date_max", 2, args.len()));
+            }
+            let da = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_max", e))?;
-            let db = NaiveDate::parse_from_str(&str_from(&b)?, "%Y-%m-%d")
+            let db = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
                 .map_err(|e| err_fn("date_max", e))?;
             Ok(Value::String(Arc::new(if da >= db {
                 da.format("%Y-%m-%d").to_string()
@@ -697,15 +966,33 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             Ok(Value::Float((x * m).round() / m))
         },
     );
-    ctx.add_function("num_floor", |v: Value| -> Result<i64, ExecutionError> {
-        Ok(num_f64(&v)?.floor() as i64)
-    });
-    ctx.add_function("num_ceil", |v: Value| -> Result<i64, ExecutionError> {
-        Ok(num_f64(&v)?.ceil() as i64)
-    });
-    ctx.add_function("num_abs", |v: Value| -> Result<Value, ExecutionError> {
-        Ok(Value::Float(num_f64(&v)?.abs()))
-    });
+    ctx.add_function(
+        "num_floor",
+        |Arguments(args): Arguments| -> Result<i64, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("num_floor", 1, args.len()));
+            }
+            Ok(num_f64(&args[0])?.floor() as i64)
+        },
+    );
+    ctx.add_function(
+        "num_ceil",
+        |Arguments(args): Arguments| -> Result<i64, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("num_ceil", 1, args.len()));
+            }
+            Ok(num_f64(&args[0])?.ceil() as i64)
+        },
+    );
+    ctx.add_function(
+        "num_abs",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("num_abs", 1, args.len()));
+            }
+            Ok(Value::Float(num_f64(&args[0])?.abs()))
+        },
+    );
     ctx.add_function(
         "num_min",
         |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
@@ -730,25 +1017,42 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "num_clamp",
-        |v: Value, lo: Value, hi: Value| -> Result<Value, ExecutionError> {
-            let x = num_f64(&v)?;
-            let a = num_f64(&lo)?;
-            let b = num_f64(&hi)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 3 {
+                return Err(arity_error("num_clamp", 3, args.len()));
+            }
+            let x = num_f64(&args[0])?;
+            let a = num_f64(&args[1])?;
+            let b = num_f64(&args[2])?;
             Ok(Value::Float(x.clamp(a, b)))
         },
     );
-    ctx.add_function("num_is_valid", |v: Value| -> bool { num_f64(&v).is_ok() });
+    ctx.add_function(
+        "num_is_valid",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("num_is_valid", 1, args.len()));
+            }
+            Ok(num_f64(&args[0]).is_ok())
+        },
+    );
     ctx.add_function(
         "num_parse",
-        |v: Value, _locale: Value| -> Result<Value, ExecutionError> {
-            num_f64(&v).map(Value::Float)
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("num_parse", 1, args.len()));
+            }
+            num_f64(&args[0]).map(Value::Float)
         },
     );
     ctx.add_function(
         "num_percent",
-        |part: Value, total: Value| -> Result<Value, ExecutionError> {
-            let p = num_f64(&part)?;
-            let t = num_f64(&total)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("num_percent", 2, args.len()));
+            }
+            let p = num_f64(&args[0])?;
+            let t = num_f64(&args[1])?;
             if t == 0.0 {
                 return Err(err_fn("num_percent", "total is zero"));
             }
@@ -774,8 +1078,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     // --- 7.7 list ---
     ctx.add_function(
         "list_compact",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let l = list_ref(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("list_compact", 1, args.len()));
+            }
+            let l = list_ref(&args[0])?;
             budget::enforce_max_list_len(l.len())?;
             let out: Vec<Value> = l.iter().filter(|x| present_value(x)).cloned().collect();
             budget::enforce_max_list_len(out.len())?;
@@ -784,8 +1091,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "list_flatten",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let l = list_ref(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("list_flatten", 1, args.len()));
+            }
+            let l = list_ref(&args[0])?;
             budget::enforce_max_list_len(l.len())?;
             let mut out = Vec::new();
             flatten_rec(l, &mut out);
@@ -793,35 +1103,59 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             Ok(Value::List(Arc::new(out)))
         },
     );
-    ctx.add_function("list_unique", |v: Value| -> Result<Value, ExecutionError> {
-        let l = list_ref(&v)?;
-        budget::enforce_max_list_len(l.len())?;
-        let mut seen = std::collections::HashSet::new();
-        let mut out = Vec::new();
-        for x in l.iter().cloned() {
-            let key = format!("{:?}", x);
-            if seen.insert(key) {
-                out.push(x);
+    ctx.add_function(
+        "list_unique",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("list_unique", 1, args.len()));
             }
-        }
-        budget::enforce_max_list_len(out.len())?;
-        Ok(Value::List(Arc::new(out)))
-    });
-    ctx.add_function("list_sort", |v: Value| -> Result<Value, ExecutionError> {
-        let l = list_ref(&v)?;
-        budget::enforce_max_list_len(l.len())?;
-        let mut l = l.to_vec();
-        l.sort_by(|a, b| partial_cmp_vals(a, b).unwrap_or(Ordering::Equal));
-        Ok(Value::List(Arc::new(l)))
-    });
-    ctx.add_function("list_first", |v: Value| -> Result<Value, ExecutionError> {
-        let l = list_ref(&v)?;
-        Ok(l.first().cloned().unwrap_or(Value::Null))
-    });
-    ctx.add_function("list_last", |v: Value| -> Result<Value, ExecutionError> {
-        let l = list_ref(&v)?;
-        Ok(l.last().cloned().unwrap_or(Value::Null))
-    });
+            let l = list_ref(&args[0])?;
+            budget::enforce_max_list_len(l.len())?;
+            let mut seen = std::collections::HashSet::new();
+            let mut out = Vec::new();
+            for x in l.iter().cloned() {
+                let key = format!("{:?}", x);
+                if seen.insert(key) {
+                    out.push(x);
+                }
+            }
+            budget::enforce_max_list_len(out.len())?;
+            Ok(Value::List(Arc::new(out)))
+        },
+    );
+    ctx.add_function(
+        "list_sort",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("list_sort", 1, args.len()));
+            }
+            let l = list_ref(&args[0])?;
+            budget::enforce_max_list_len(l.len())?;
+            let mut l = l.to_vec();
+            l.sort_by(|a, b| partial_cmp_vals(a, b).unwrap_or(Ordering::Equal));
+            Ok(Value::List(Arc::new(l)))
+        },
+    );
+    ctx.add_function(
+        "list_first",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("list_first", 1, args.len()));
+            }
+            let l = list_ref(&args[0])?;
+            Ok(l.first().cloned().unwrap_or(Value::Null))
+        },
+    );
+    ctx.add_function(
+        "list_last",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("list_last", 1, args.len()));
+            }
+            let l = list_ref(&args[0])?;
+            Ok(l.last().cloned().unwrap_or(Value::Null))
+        },
+    );
     ctx.add_function(
         "list_at",
         |v: Value, idx: i64, fb: Value| -> Result<Value, ExecutionError> {
@@ -836,19 +1170,33 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             }))
         },
     );
-    ctx.add_function("list_length", |v: Value| -> Result<i64, ExecutionError> {
-        Ok(list_ref(&v)?.len() as i64)
-    });
+    ctx.add_function(
+        "list_length",
+        |Arguments(args): Arguments| -> Result<i64, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("list_length", 1, args.len()));
+            }
+            Ok(list_ref(&args[0])?.len() as i64)
+        },
+    );
     ctx.add_function(
         "list_contains",
-        |v: Value, x: Value| -> Result<bool, ExecutionError> { Ok(list_ref(&v)?.contains(&x)) },
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("list_contains", 2, args.len()));
+            }
+            Ok(list_ref(&args[0])?.contains(&args[1]))
+        },
     );
     ctx.add_function(
         "list_join",
-        |v: Value, sep: Value| -> Result<Value, ExecutionError> {
-            let l = list_ref(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("list_join", 2, args.len()));
+            }
+            let l = list_ref(&args[0])?;
             budget::enforce_max_list_len(l.len())?;
-            let d = str_from(&sep)?;
+            let d = str_from(&args[1])?;
             let mut out = String::new();
             for (i, x) in l.iter().enumerate() {
                 if i > 0 {
@@ -862,8 +1210,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "list_filter_present",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let l = list_ref(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("list_filter_present", 1, args.len()));
+            }
+            let l = list_ref(&args[0])?;
             budget::enforce_max_list_len(l.len())?;
             let out: Vec<Value> = l.iter().filter(|x| present_value(x)).cloned().collect();
             budget::enforce_max_list_len(out.len())?;
@@ -893,11 +1244,14 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "list_to_map",
-        |v: Value, key_field: Value| -> Result<Value, ExecutionError> {
-            let l = list_ref(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("list_to_map", 2, args.len()));
+            }
+            let l = list_ref(&args[0])?;
             budget::enforce_max_list_len(l.len())?;
             let l = l.to_vec();
-            let kf = str_from(&key_field)?;
+            let kf = str_from(&args[1])?;
             let mut hm = std::collections::HashMap::new();
             for item in l {
                 let key = map_lookup_value(&item, &kf)
@@ -929,16 +1283,22 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "map_has",
-        |obj: Value, path: Value| -> Result<bool, ExecutionError> {
-            let p = str_from(&path)?;
-            Ok(map_path_exists(&obj, &p))
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("map_has", 2, args.len()));
+            }
+            let p = str_from(&args[1])?;
+            Ok(map_path_exists(&args[0], &p))
         },
     );
     ctx.add_function(
         "map_pick",
-        |obj: Value, keys: Value| -> Result<Value, ExecutionError> {
-            let m = as_map(&obj)?;
-            let ks = list_ref(&keys)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("map_pick", 2, args.len()));
+            }
+            let m = as_map(&args[0])?;
+            let ks = list_ref(&args[1])?;
             budget::enforce_max_list_len(ks.len())?;
             let mut out = std::collections::HashMap::new();
             for k in ks.iter() {
@@ -952,9 +1312,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "map_omit",
-        |obj: Value, keys: Value| -> Result<Value, ExecutionError> {
-            let m = as_map(&obj)?;
-            let kref = list_ref(&keys)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("map_omit", 2, args.len()));
+            }
+            let m = as_map(&args[0])?;
+            let kref = list_ref(&args[1])?;
             budget::enforce_max_list_len(kref.len())?;
             let ks: std::collections::HashSet<String> =
                 kref.iter().map(str_from).collect::<Result<_, _>>()?;
@@ -968,46 +1331,64 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "map_merge",
-        |a: Value, b: Value| -> Result<Value, ExecutionError> {
-            let ja = cel_to_json(&a).map_err(|e| err_fn("map_merge", e))?;
-            let jb = cel_to_json(&b).map_err(|e| err_fn("map_merge", e))?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("map_merge", 2, args.len()));
+            }
+            let ja = cel_to_json(&args[0]).map_err(|e| err_fn("map_merge", e))?;
+            let jb = cel_to_json(&args[1]).map_err(|e| err_fn("map_merge", e))?;
             let merged = merge_json_objects(ja, jb);
             cel::to_value(merged).map_err(|e| err_fn("map_merge", e))
         },
     );
     ctx.add_function(
         "map_deep_merge",
-        |a: Value, b: Value| -> Result<Value, ExecutionError> {
-            let ja = cel_to_json(&a).map_err(|e| err_fn("map_deep_merge", e))?;
-            let jb = cel_to_json(&b).map_err(|e| err_fn("map_deep_merge", e))?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("map_deep_merge", 2, args.len()));
+            }
+            let ja = cel_to_json(&args[0]).map_err(|e| err_fn("map_deep_merge", e))?;
+            let jb = cel_to_json(&args[1]).map_err(|e| err_fn("map_deep_merge", e))?;
             let merged = deep_merge_json(ja, jb);
             cel::to_value(merged).map_err(|e| err_fn("map_deep_merge", e))
         },
     );
     ctx.add_function(
         "map_set",
-        |obj: Value, path: Value, val: Value| -> Result<Value, ExecutionError> {
-            let mut j = cel_to_json(&obj).map_err(|e| err_fn("map_set", e))?;
-            let p = str_from(&path)?;
-            let mut vj = cel_to_json(&val).map_err(|e| err_fn("map_set", e))?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 3 {
+                return Err(arity_error("map_set", 3, args.len()));
+            }
+            let mut j = cel_to_json(&args[0]).map_err(|e| err_fn("map_set", e))?;
+            let p = str_from(&args[1])?;
+            let mut vj = cel_to_json(&args[2]).map_err(|e| err_fn("map_set", e))?;
             set_json_path(&mut j, &p, &mut vj)?;
             cel::to_value(j).map_err(|e| err_fn("map_set", e))
         },
     );
-    ctx.add_function("map_keys", |obj: Value| -> Result<Value, ExecutionError> {
-        let m = as_map(&obj)?;
-        let keys: Vec<Value> = m
-            .map
-            .keys()
-            .map(|k| Value::String(Arc::new(k.to_string())))
-            .collect();
-        budget::enforce_max_list_len(keys.len())?;
-        Ok(Value::List(Arc::new(keys)))
-    });
+    ctx.add_function(
+        "map_keys",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("map_keys", 1, args.len()));
+            }
+            let m = as_map(&args[0])?;
+            let keys: Vec<Value> = m
+                .map
+                .keys()
+                .map(|k| Value::String(Arc::new(k.to_string())))
+                .collect();
+            budget::enforce_max_list_len(keys.len())?;
+            Ok(Value::List(Arc::new(keys)))
+        },
+    );
     ctx.add_function(
         "map_values",
-        |obj: Value| -> Result<Value, ExecutionError> {
-            let m = as_map(&obj)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("map_values", 1, args.len()));
+            }
+            let m = as_map(&args[0])?;
             let vals: Vec<Value> = m.map.values().cloned().collect();
             budget::enforce_max_list_len(vals.len())?;
             Ok(Value::List(Arc::new(vals)))
@@ -1015,8 +1396,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "map_entries",
-        |obj: Value| -> Result<Value, ExecutionError> {
-            let m = as_map(&obj)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("map_entries", 1, args.len()));
+            }
+            let m = as_map(&args[0])?;
             let mut entries = Vec::new();
             for (k, v) in m.map.iter() {
                 let mut e = std::collections::HashMap::new();
@@ -1072,9 +1456,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     let creg = Arc::clone(&codes);
     ctx.add_function(
         "code_map",
-        move |sys: Value, val: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&sys)?;
-            let v = str_from(&val)?;
+        move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("code_map", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let v = str_from(&args[1])?;
             let e = creg
                 .map(&s, &v)
                 .ok_or_else(|| err_fn("code_map", "unknown code"))?;
@@ -1084,9 +1471,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     let creg2 = Arc::clone(&codes);
     ctx.add_function(
         "code_map_or_null",
-        move |sys: Value, val: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&sys)?;
-            let v = str_from(&val)?;
+        move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("code_map_or_null", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let v = str_from(&args[1])?;
             Ok(match creg2.map(&s, &v) {
                 Some(e) => Value::String(Arc::new(e.id.clone())),
                 None => Value::Null,
@@ -1096,12 +1486,15 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     let creg3 = Arc::clone(&codes);
     ctx.add_function(
         "code_map_or_default",
-        move |sys: Value, val: Value, fb: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&sys)?;
-            let v = str_from(&val)?;
+        move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 3 {
+                return Err(arity_error("code_map_or_default", 3, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let v = str_from(&args[1])?;
             Ok(match creg3.map(&s, &v) {
                 Some(e) => Value::String(Arc::new(e.id.clone())),
-                None => fb,
+                None => args[2].clone(),
             })
         },
     );
@@ -1132,18 +1525,24 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     let creg5 = Arc::clone(&codes);
     ctx.add_function(
         "code_exists",
-        move |sys: Value, val: Value| -> Result<bool, ExecutionError> {
-            let s = str_from(&sys)?;
-            let v = str_from(&val)?;
+        move |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("code_exists", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let v = str_from(&args[1])?;
             Ok(creg5.exists(&s, &v))
         },
     );
     let creg6 = Arc::clone(&codes);
     ctx.add_function(
         "code_canonical",
-        move |sys: Value, val: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&sys)?;
-            let v = str_from(&val)?;
+        move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("code_canonical", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let v = str_from(&args[1])?;
             let e = creg6
                 .map(&s, &v)
                 .ok_or_else(|| err_fn("code_canonical", "unknown code"))?;
@@ -1177,21 +1576,45 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     let creg7 = Arc::clone(&codes);
     ctx.add_function(
         "code_reverse_map",
-        move |sys: Value, canon: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&sys)?;
-            let c = str_from(&canon)?;
+        move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("code_reverse_map", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let c = str_from(&args[1])?;
             Ok(match creg7.reverse_map(&s, &c) {
                 Some(x) => Value::String(Arc::new(x)),
                 None => Value::Null,
             })
         },
     );
+    let creg8 = Arc::clone(&codes);
     ctx.add_function(
         "code_normalize",
-        |v: Value| -> Result<Value, ExecutionError> {
-            Ok(Value::String(Arc::new(CodeSystemRegistry::normalize_code(
-                &str_from(&v)?,
-            ))))
+        move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            match args.len() {
+                1 => Ok(Value::String(Arc::new(CodeSystemRegistry::normalize_code(
+                    &str_from(&args[0])?,
+                )))),
+                2 => {
+                    let system = str_from(&args[0])?;
+                    let value = str_from(&args[1])?;
+                    if !creg8.has_system(&system) {
+                        return Err(err_fn(
+                            "code_normalize",
+                            format!("unknown code system: {system}"),
+                        ));
+                    }
+                    let entry = creg8
+                        .map(&system, &value)
+                        .ok_or_else(|| err_fn("code_normalize", format!("unknown code: {value}")))?;
+                    Ok(Value::String(Arc::new(entry.id.clone())))
+                }
+                n => Err(err_fn(
+                    "code_normalize",
+                    format!("expected 1 or 2 arguments, got {n}"),
+                )),
+            }
         },
     );
 
@@ -1215,9 +1638,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "id_uuid_v5",
-        |ns: Value, val: Value| -> Result<Value, ExecutionError> {
-            let n = str_from(&ns)?;
-            let v = str_from(&val)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("id_uuid_v5", 2, args.len()));
+            }
+            let n = str_from(&args[0])?;
+            let v = str_from(&args[1])?;
             let u = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, format!("{n}:{v}").as_bytes());
             Ok(Value::String(Arc::new(u.to_string())))
         },
@@ -1241,9 +1667,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "id_slug",
-        |pfx: Value, val: Value| -> Result<Value, ExecutionError> {
-            let p = str_from(&pfx)?;
-            let s = str_from(&val)?.to_ascii_lowercase();
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("id_slug", 2, args.len()));
+            }
+            let p = str_from(&args[0])?;
+            let s = str_from(&args[1])?.to_ascii_lowercase();
             let slug: String = s
                 .chars()
                 .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
@@ -1255,14 +1684,20 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             Ok(Value::String(Arc::new(format!("{p}_{slug}"))))
         },
     );
-    ctx.add_function("id_clean", |v: Value| -> Result<Value, ExecutionError> {
-        let s = str_from(&v)?;
-        let out: String = s
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
-            .collect();
-        Ok(Value::String(Arc::new(out)))
-    });
+    ctx.add_function(
+        "id_clean",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("id_clean", 1, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            let out: String = s
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+                .collect();
+            Ok(Value::String(Arc::new(out)))
+        },
+    );
     ctx.add_function(
         "id_is_valid",
         |v: Value, pat: Value| -> Result<bool, ExecutionError> {
@@ -1276,7 +1711,15 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
 
     // --- 7.11 person ---
-    ctx.add_function("person_age", |a: Value, b: Value| date_age_on_impl(a, b));
+    ctx.add_function(
+        "person_age",
+        |Arguments(args): Arguments| -> Result<i64, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("person_age", 2, args.len()));
+            }
+            date_age_on_impl(args[0].clone(), args[1].clone())
+        },
+    );
     ctx.add_function(
         "person_is_minor",
         |bd: Value, rd: Value, th: Value| -> Result<bool, ExecutionError> {
@@ -1292,72 +1735,114 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     let creg8 = Arc::clone(&codes);
     ctx.add_function(
         "person_sex_or_gender",
-        move |v: Value, sys: Value| -> Result<Value, ExecutionError> {
-            let s = if matches!(sys, Value::Null) || is_missing(&sys) {
+        move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("person_sex_or_gender", 2, args.len()));
+            }
+            let s = if matches!(args[1], Value::Null) || is_missing(&args[1]) {
                 return Err(err_fn("person_sex_or_gender", "system required"));
             } else {
-                str_from(&sys)?
+                str_from(&args[1])?
             };
-            let val = str_from(&v)?;
+            let val = str_from(&args[0])?;
             let e = creg8
                 .map(&s, &val)
                 .ok_or_else(|| err_fn("person_sex_or_gender", "unmapped"))?;
             Ok(Value::String(Arc::new(e.id.clone())))
         },
     );
-    ctx.add_function("person_normalize_phone", |v: Value, country: Value| {
-        phone_normalize_impl(v, country)
-    });
+    ctx.add_function(
+        "person_normalize_phone",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("person_normalize_phone", 2, args.len()));
+            }
+            phone_normalize_impl(args[0].clone(), args[1].clone())
+        },
+    );
 
     // --- 7.12 phone ---
-    ctx.add_function("phone_normalize", |v: Value, country: Value| {
-        phone_normalize_impl(v, country)
-    });
-    ctx.add_function("phone_is_valid", |v: Value, country: Value| -> bool {
-        let Ok(s) = str_from(&v) else {
-            return false;
-        };
-        crate::functions::phone::is_valid(&s, &country)
-    });
+    ctx.add_function(
+        "phone_normalize",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("phone_normalize", 2, args.len()));
+            }
+            phone_normalize_impl(args[0].clone(), args[1].clone())
+        },
+    );
+    ctx.add_function(
+        "phone_is_valid",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("phone_is_valid", 2, args.len()));
+            }
+            let Ok(s) = str_from(&args[0]) else {
+                return Ok(false);
+            };
+            Ok(crate::functions::phone::is_valid(&s, &args[1]))
+        },
+    );
     ctx.add_function(
         "phone_country_code",
-        |v: Value, country: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
-            match crate::functions::phone::country_calling_code(&s, &country) {
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("phone_country_code", 2, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            match crate::functions::phone::country_calling_code(&s, &args[1]) {
                 Ok(cc) => Ok(Value::String(Arc::new(cc))),
                 Err(m) => Err(err_fn("phone_country_code", m)),
             }
         },
     );
-    ctx.add_function("phone_mask", |v: Value| -> Result<Value, ExecutionError> {
-        let s = str_from(&v)?;
-        if s.len() <= 4 {
-            return Ok(Value::String(Arc::new("*".repeat(s.len()))));
-        }
-        let vis = 4;
-        let masked = "*".repeat(s.len().saturating_sub(vis)) + &s[s.len() - vis..];
-        Ok(Value::String(Arc::new(masked)))
-    });
+    ctx.add_function(
+        "phone_mask",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("phone_mask", 1, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            if s.len() <= 4 {
+                return Ok(Value::String(Arc::new("*".repeat(s.len()))));
+            }
+            let vis = 4;
+            let masked = "*".repeat(s.len().saturating_sub(vis)) + &s[s.len() - vis..];
+            Ok(Value::String(Arc::new(masked)))
+        },
+    );
 
     // --- 7.13 email ---
     ctx.add_function(
         "email_normalize",
-        |v: Value| -> Result<Value, ExecutionError> {
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("email_normalize", 1, args.len()));
+            }
             Ok(Value::String(Arc::new(
-                str_from(&v)?.trim().to_ascii_lowercase(),
+                str_from(&args[0])?.trim().to_ascii_lowercase(),
             )))
         },
     );
-    ctx.add_function("email_is_valid", |v: Value| -> bool {
-        let Ok(s) = str_from(&v) else {
-            return false;
-        };
-        s.contains('@') && !s.starts_with('@') && !s.ends_with('@')
-    });
+    ctx.add_function(
+        "email_is_valid",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("email_is_valid", 1, args.len()));
+            }
+            let Ok(s) = str_from(&args[0]) else {
+                return Ok(false);
+            };
+            Ok(s.contains('@') && !s.starts_with('@') && !s.ends_with('@'))
+        },
+    );
     ctx.add_function(
         "email_domain",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("email_domain", 1, args.len()));
+            }
+            let s = str_from(&args[0])?;
             let d = s.split('@').nth(1).unwrap_or("").to_string();
             Ok(Value::String(Arc::new(d)))
         },
@@ -1366,9 +1851,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     // --- 7.14 geo ---
     ctx.add_function(
         "geo_point",
-        |lat: Value, lon: Value| -> Result<Value, ExecutionError> {
-            let la = num_f64(&lat)?;
-            let lo = num_f64(&lon)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("geo_point", 2, args.len()));
+            }
+            let la = num_f64(&args[0])?;
+            let lo = num_f64(&args[1])?;
             let mut m = std::collections::HashMap::new();
             m.insert(
                 cel::objects::Key::String(Arc::new("type".into())),
@@ -1381,38 +1869,59 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             Ok(Value::Map(cel::objects::Map { map: Arc::new(m) }))
         },
     );
-    ctx.add_function("geo_is_valid_lat", |v: Value| -> bool {
-        num_f64(&v)
-            .map(|la| (-90.0..=90.0).contains(&la))
-            .unwrap_or(false)
-    });
-    ctx.add_function("geo_is_valid_lon", |v: Value| -> bool {
-        num_f64(&v)
-            .map(|lo| (-180.0..=180.0).contains(&lo))
-            .unwrap_or(false)
-    });
+    ctx.add_function(
+        "geo_is_valid_lat",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("geo_is_valid_lat", 1, args.len()));
+            }
+            Ok(num_f64(&args[0])
+                .map(|la| (-90.0..=90.0).contains(&la))
+                .unwrap_or(false))
+        },
+    );
+    ctx.add_function(
+        "geo_is_valid_lon",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("geo_is_valid_lon", 1, args.len()));
+            }
+            Ok(num_f64(&args[0])
+                .map(|lo| (-180.0..=180.0).contains(&lo))
+                .unwrap_or(false))
+        },
+    );
     ctx.add_function(
         "geo_normalize_lat",
-        |v: Value| -> Result<Value, ExecutionError> {
-            num_f64(&v).map(|x| Value::Float(x.clamp(-90.0, 90.0)))
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("geo_normalize_lat", 1, args.len()));
+            }
+            num_f64(&args[0]).map(|x| Value::Float(x.clamp(-90.0, 90.0)))
         },
     );
     ctx.add_function(
         "geo_normalize_lon",
-        |v: Value| -> Result<Value, ExecutionError> {
-            num_f64(&v).map(|x| Value::Float(x.clamp(-180.0, 180.0)))
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("geo_normalize_lon", 1, args.len()));
+            }
+            num_f64(&args[0]).map(|x| Value::Float(x.clamp(-180.0, 180.0)))
         },
     );
     let creg9 = Arc::clone(&codes);
     ctx.add_function(
         "geo_admin_code",
-        move |v: Value, sys: Value| -> Result<Value, ExecutionError> {
-            let s = if matches!(sys, Value::Null) || is_missing(&sys) {
+        move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("geo_admin_code", 2, args.len()));
+            }
+            let s = if matches!(args[1], Value::Null) || is_missing(&args[1]) {
                 return Err(err_fn("geo_admin_code", "system required"));
             } else {
-                str_from(&sys)?
+                str_from(&args[1])?
             };
-            let val = str_from(&v)?;
+            let val = str_from(&args[0])?;
             let e = creg9
                 .map(&s, &val)
                 .ok_or_else(|| err_fn("geo_admin_code", "unmapped"))?;
@@ -1439,8 +1948,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "address_normalize_country",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let s = str_from(&v)?.trim().to_ascii_uppercase();
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("address_normalize_country", 1, args.len()));
+            }
+            let s = str_from(&args[0])?.trim().to_ascii_uppercase();
             if s.len() == 2 {
                 Ok(Value::String(Arc::new(s)))
             } else {
@@ -1452,8 +1964,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "address_postal_code",
-        |v: Value| -> Result<Value, ExecutionError> {
-            Ok(Value::String(Arc::new(str_from(&v)?.trim().to_string())))
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("address_postal_code", 1, args.len()));
+            }
+            Ok(Value::String(Arc::new(str_from(&args[0])?.trim().to_string())))
         },
     );
 
@@ -1549,16 +2064,25 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
 
     // --- 7.17 json ---
-    ctx.add_function("json_parse", |v: Value| -> Result<Value, ExecutionError> {
-        let s = str_from(&v)?;
-        budget::enforce_max_string_bytes(s.len())?;
-        let j: JsonValue = serde_json::from_str(&s).map_err(|e| err_fn("json_parse", e))?;
-        cel::to_value(j).map_err(|e| err_fn("json_parse", e))
-    });
+    ctx.add_function(
+        "json_parse",
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("json_parse", 1, args.len()));
+            }
+            let s = str_from(&args[0])?;
+            budget::enforce_max_string_bytes(s.len())?;
+            let j: JsonValue = serde_json::from_str(&s).map_err(|e| err_fn("json_parse", e))?;
+            cel::to_value(j).map_err(|e| err_fn("json_parse", e))
+        },
+    );
     ctx.add_function(
         "json_stringify",
-        |v: Value| -> Result<Value, ExecutionError> {
-            let j = cel_to_json(&v).map_err(|e| err_fn("json_stringify", e))?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("json_stringify", 1, args.len()));
+            }
+            let j = cel_to_json(&args[0]).map_err(|e| err_fn("json_stringify", e))?;
             let s = serde_json::to_string(&j).map_err(|e| err_fn("json_stringify", e))?;
             budget::enforce_max_string_bytes(s.len())?;
             Ok(Value::String(Arc::new(s)))
@@ -1582,9 +2106,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     // --- 7.18 fhir ---
     ctx.add_function(
         "fhir_reference",
-        |resource_type: Value, resource_id: Value| -> Result<Value, ExecutionError> {
-            let t = str_from(&resource_type)?;
-            let id = str_from(&resource_id)?;
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 2 {
+                return Err(arity_error("fhir_reference", 2, args.len()));
+            }
+            let t = str_from(&args[0])?;
+            let id = str_from(&args[1])?;
             Ok(Value::String(Arc::new(format!("{t}/{id}"))))
         },
     );
@@ -1625,7 +2152,10 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
     );
     ctx.add_function(
         "privacy_redact",
-        |_v: Value| -> Result<Value, ExecutionError> {
+        |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("privacy_redact", 1, args.len()));
+            }
             Ok(Value::String(Arc::new("[REDACTED]".into())))
         },
     );

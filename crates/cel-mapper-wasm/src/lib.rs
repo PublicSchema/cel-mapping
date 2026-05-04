@@ -401,7 +401,7 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&out).unwrap();
         assert!(v.get("error").is_none(), "unexpected error: {v}");
         assert_eq!(v["hash_status"], "canonical");
-        assert!(v["deterministic_hash"].as_str().unwrap().len() > 0);
+        assert!(!v["deterministic_hash"].as_str().unwrap().is_empty());
     }
 
     #[test]

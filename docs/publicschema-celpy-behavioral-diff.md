@@ -1,34 +1,28 @@
-# PublicSchema celpy Behavioral Diff
+# PublicSchema celpy → cel-mapping Migration Changelog
 
-Status: Phase 0 template. To be filled before Phase 4 ships.
+Status: post-migration. The hosted runtime cutover from `celpy` to the
+`cel-mapping` Rust core is complete; the celext v1 → cel-mapping rewriter at
+`publicschema-build/build/cel_mapping_adapter.py::rewrite_celext_v1_to_cel_mapping`
+is the canonical translation surface. The shadow-mode acceptance corpus at
+`publicschema.com/apps/core/tests/parity/test_shadow_zero_diff.py` enforces
+zero-diff transformed output between the two runtimes on every commit.
+
+This document is preserved as a one-time changelog of the behavioral cases
+that needed to converge during the migration. Each section captures the
+spec-correct answer (what shipped), the legacy `celpy` behavior we replaced,
+the verification path, and the parity fixture that pins the case.
+
 Spec reference: `spec-publicschema-v0.2.md` §13.
-Implementation plan reference: `implementation-plan-publicschema-v0.2.md` §3.3.
-
-This document tracks known and expected behavioral differences between the
-current hosted `celpy` transform path and the `cel-mapping` Rust runtime.
-
-It MUST be reviewed and accepted before the Phase 4 hosted runtime migration
-begins (spec §13, implementation plan Phase 4 gate). Each section records the
-expected v0.2 behavior (the spec-correct answer), the current `celpy` behavior
-(to be filled during Phase 4 shadow runs), the verification status, and the
-path to a parity fixture once fixtures exist.
-
-## How to fill this document
-
-During Phase 4 shadow runs:
-
-1. Run the same mapping + input through both `celpy` and `cel-mapping`.
-2. Compare outputs, logs, and errors.
-3. Fill in "Current celpy behavior" for each section.
-4. Set status to `matches`, `intentional-diff`, or `bug-to-fix`.
-5. Write a parity fixture at the path listed under "Test fixture" and commit it.
 
 Status values:
 
-- `unverified`: shadow run not yet done; celpy behavior unknown.
-- `matches`: cel-mapping and celpy produce the same result.
-- `intentional-diff`: behavior deliberately diverges; reason recorded here.
-- `bug-to-fix`: cel-mapping has a defect that must be fixed before Phase 4 flips.
+- `matches`: cel-mapping and celpy produce the same result; pinned by a
+  parity fixture.
+- `intentional-diff`: cel-mapping deliberately diverges from celpy because
+  the spec mandates the new behavior; reason recorded inline.
+- `migrated-rewrite`: the difference is hidden from authors by the rewriter
+  (e.g. `parseDate` token translation); both runtimes produce the same
+  observable output.
 
 ---
 

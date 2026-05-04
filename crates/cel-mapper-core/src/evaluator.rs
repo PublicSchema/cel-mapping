@@ -12,7 +12,8 @@ use crate::mapping::FieldYaml;
 use crate::missing::{is_missing, MISSING_STR};
 use crate::output::{cel_to_json, omit_null_keys};
 use crate::paths::{
-    augment_json_with_paths, augment_loop_element, build_binding_envelope, collect_dotted_paths,
+    augment_json_with_paths, augment_loop_element, build_binding_envelope,
+    collect_missing_aware_injection_paths,
     collect_dotted_paths_with_roots, filter_paths_by_roots,
 };
 use cel::{Context, ExecutionError, Program, Value};
@@ -117,7 +118,34 @@ pub fn evaluate_mapping(
 }
 
 fn collect_mapping_paths(mapping: &CompiledMapping) -> Vec<(String, Vec<String>)> {
-    let mut paths = collect_dotted_paths(&mapping.all_expressions);
+    // Build a flat list of all compiled programs in this mapping so we can
+    // perform AST-based classification (missing-aware vs strict context).
+    let mut programs: Vec<&cel::Program> = Vec::new();
+    for v in &mapping.validations {
+        programs.push(&v.cel.program);
+    }
+    for rec in &mapping.records {
+        if let Some(em) = &rec.emit {
+            programs.push(&em.program);
+        }
+        if let Some(fx) = &rec.foreach {
+            programs.push(&fx.program);
+        }
+        if let Some(w) = &rec.when {
+            programs.push(&w.program);
+        }
+        for (_, cel) in &rec.vars {
+            programs.push(&cel.program);
+        }
+        for field in &rec.fields {
+            programs.push(&field.cel.program);
+        }
+    }
+    let mut paths = collect_missing_aware_injection_paths(&programs);
+
+    // For custom `foreach.as` bindings (non-standard root names like a user-defined
+    // alias), AST classification cannot infer the root from the standard set.
+    // Fall back to regex-based collection for those extra roots only.
     for rec in &mapping.records {
         let Some(as_name) = rec.r#as.as_deref() else {
             continue;
@@ -750,7 +778,7 @@ pub fn evaluate_cel_expression(
     codes: Arc<crate::code_system::CodeSystemRegistry>,
 ) -> Result<JsonValue, StandaloneEvalError> {
     let cel = crate::compiler::compile_expr(expr, limits, "expression".into())?;
-    let paths = collect_dotted_paths(std::slice::from_ref(&cel.source));
+    let paths = collect_missing_aware_injection_paths(&[&cel.program]);
     let (src_json, root_json, ctx_json) = build_binding_envelope(source, ctx, &paths, MISSING_STR);
     let source_val = json_to_cel(&src_json);
     let root_val = json_to_cel(&root_json);
@@ -850,7 +878,7 @@ pub fn preview_cel_expression(
         }
     };
 
-    let paths = collect_dotted_paths(std::slice::from_ref(&cel.source));
+    let paths = collect_missing_aware_injection_paths(&[&cel.program]);
     let (src_json, root_json, ctx_json) = build_binding_envelope(source, ctx, &paths, MISSING_STR);
     let source_val = json_to_cel(&src_json);
     let root_val = json_to_cel(&root_json);
