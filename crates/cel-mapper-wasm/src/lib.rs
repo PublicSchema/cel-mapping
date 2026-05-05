@@ -188,8 +188,7 @@ impl WasmMappingRuntime {
             Ok(v) => v,
             Err(e) => return json!({ "error": format!("source_json: {e}") }).to_string(),
         };
-        let opts: serde_json::Value =
-            serde_json::from_str(options_json).unwrap_or(json!({}));
+        let opts: serde_json::Value = serde_json::from_str(options_json).unwrap_or(json!({}));
         let direction_str = opts
             .get("direction")
             .and_then(|v| v.as_str())
@@ -198,15 +197,11 @@ impl WasmMappingRuntime {
             Ok(d) => d,
             Err(msg) => return json!({ "error": msg }).to_string(),
         };
-        let ctx = opts
-            .get("context")
-            .cloned()
-            .unwrap_or(json!({}));
+        let ctx = opts.get("context").cloned().unwrap_or(json!({}));
         let r = self
             .inner
             .preview_publicschema_rule_expression(&rule, source, direction, ctx);
-        serde_json::to_string(&r)
-            .unwrap_or_else(|e| json!({ "error": e.to_string() }).to_string())
+        serde_json::to_string(&r).unwrap_or_else(|e| json!({ "error": e.to_string() }).to_string())
     }
 
     /// Returns the helper-function registry metadata as JSON.
@@ -214,57 +209,157 @@ impl WasmMappingRuntime {
     pub fn get_publicschema_helper_metadata(&self) -> String {
         let helper_names: &[&str] = &[
             // §7.1 presence
-            "present", "missing", "blank", "coalesce", "default", "require", "null_if",
+            "present",
+            "missing",
+            "blank",
+            "coalesce",
+            "default",
+            "require",
+            "null_if",
             "null_if_blank",
             // §7.2 type
-            "type_string", "type_int", "type_float", "type_bool", "type_list", "type_map",
-            "type_is_string", "type_is_number", "type_is_bool", "type_is_list", "type_is_map",
+            "type_string",
+            "type_int",
+            "type_float",
+            "type_bool",
+            "type_list",
+            "type_map",
+            "type_is_string",
+            "type_is_number",
+            "type_is_bool",
+            "type_is_list",
+            "type_is_map",
             // §7.3 text
-            "text_length", "text_lower", "text_upper", "text_title", "text_trim", "text_slug",
-            "text_left", "text_right", "text_substr", "text_join", "text_split", "text_replace",
-            "text_regex_replace", "text_remove_accents", "text_normalize_space", "text_contains",
-            "text_starts_with", "text_ends_with", "text_matches",
+            "text_length",
+            "text_lower",
+            "text_upper",
+            "text_title",
+            "text_trim",
+            "text_slug",
+            "text_left",
+            "text_right",
+            "text_substr",
+            "text_join",
+            "text_split",
+            "text_replace",
+            "text_regex_replace",
+            "text_remove_accents",
+            "text_normalize_space",
+            "text_contains",
+            "text_starts_with",
+            "text_ends_with",
+            "text_matches",
             // §7.4 numeric
-            "num_abs", "num_ceil", "num_floor", "num_round", "num_clamp", "num_min", "num_max",
-            "num_is_valid", "num_parse", "num_percent", "num_safe_divide",
+            "num_abs",
+            "num_ceil",
+            "num_floor",
+            "num_round",
+            "num_clamp",
+            "num_min",
+            "num_max",
+            "num_is_valid",
+            "num_parse",
+            "num_percent",
+            "num_safe_divide",
             // §7.5 list
-            "list_length", "list_first", "list_last", "list_at", "list_sort", "list_unique",
-            "list_compact", "list_filter_present", "list_flatten", "list_join", "list_contains",
+            "list_length",
+            "list_first",
+            "list_last",
+            "list_at",
+            "list_sort",
+            "list_unique",
+            "list_compact",
+            "list_filter_present",
+            "list_flatten",
+            "list_join",
+            "list_contains",
             "list_to_map",
             // §7.6 map
-            "map_keys", "map_values", "map_entries", "map_has", "map_get", "map_set", "map_pick",
-            "map_omit", "map_merge", "map_deep_merge",
+            "map_keys",
+            "map_values",
+            "map_entries",
+            "map_has",
+            "map_get",
+            "map_set",
+            "map_pick",
+            "map_omit",
+            "map_merge",
+            "map_deep_merge",
             // §7.7 date
-            "date_today", "date_parse", "date_format", "date_is_valid", "date_is_before",
-            "date_is_after", "date_add_days", "date_add_months", "date_start_of_month",
-            "date_end_of_month", "date_days_between", "date_years_between", "date_age_on",
-            "date_min", "date_max", "date_parse_datetime",
+            "date_today",
+            "date_parse",
+            "date_format",
+            "date_is_valid",
+            "date_is_before",
+            "date_is_after",
+            "date_add_days",
+            "date_add_months",
+            "date_start_of_month",
+            "date_end_of_month",
+            "date_days_between",
+            "date_years_between",
+            "date_age_on",
+            "date_min",
+            "date_max",
+            "date_parse_datetime",
             // §7.8 id
-            "id_clean", "id_hash", "id_slug", "id_make", "id_is_valid",
+            "id_clean",
+            "id_hash",
+            "id_slug",
+            "id_make",
+            "id_is_valid",
             // §7.9 email
-            "email_is_valid", "email_normalize", "email_domain",
+            "email_is_valid",
+            "email_normalize",
+            "email_domain",
             // §7.10 phone
-            "phone_is_valid", "phone_normalize", "phone_mask", "phone_country_code",
+            "phone_is_valid",
+            "phone_normalize",
+            "phone_mask",
+            "phone_country_code",
             "person_normalize_phone",
             // §7.11 geo
-            "geo_is_valid_lat", "geo_is_valid_lon", "geo_normalize_lat", "geo_normalize_lon",
-            "geo_point", "geo_admin_code",
+            "geo_is_valid_lat",
+            "geo_is_valid_lon",
+            "geo_normalize_lat",
+            "geo_normalize_lon",
+            "geo_point",
+            "geo_admin_code",
             // §7.12 name
-            "name_parts", "name_full", "name_initials",
+            "name_parts",
+            "name_full",
+            "name_initials",
             // §7.13 person
-            "person_age", "person_is_minor", "person_sex_or_gender",
+            "person_age",
+            "person_is_minor",
+            "person_sex_or_gender",
             // §7.14 address
-            "address_line", "address_postal_code", "address_normalize_country",
+            "address_line",
+            "address_postal_code",
+            "address_normalize_country",
             // §7.15 code system
-            "code_exists", "code_canonical", "code_label", "code_map", "code_map_or_null",
-            "code_map_or_default", "code_normalize", "code_reverse_map",
+            "code_exists",
+            "code_canonical",
+            "code_label",
+            "code_map",
+            "code_map_or_null",
+            "code_map_or_default",
+            "code_normalize",
+            "code_reverse_map",
             // §7.16 privacy
-            "privacy_mask", "privacy_redact",
+            "privacy_mask",
+            "privacy_redact",
             // §7.17 validate
-            "validate_required", "validate_in", "validate_range", "validate_matches",
-            "validate_error", "validate_warn",
+            "validate_required",
+            "validate_in",
+            "validate_range",
+            "validate_matches",
+            "validate_error",
+            "validate_warn",
             // §7.18 json
-            "json_parse", "json_stringify", "json_path",
+            "json_parse",
+            "json_stringify",
+            "json_path",
         ];
         let helpers: Vec<serde_json::Value> = helper_names
             .iter()

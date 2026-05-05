@@ -90,6 +90,7 @@ export type PublicSchemaStatus =
   | "omitted"
   | "missing"
   | "skipped"
+  | "value_unmapped"
   | "formula_error"
   | "write_error"
   | "validation_error";
@@ -130,16 +131,27 @@ export interface PublicSchemaTransformResult {
   errors: unknown[];
 }
 
+/** One `value_mappings[]` row on a PublicSchema property-mapping rule. */
+export interface PublicSchemaValueMapping {
+  source_value: string;
+  target_value?: string | null;
+  quality?: string | null;
+  ignored?: boolean;
+}
+
 /**
  * A PublicSchema property-mapping rule as accepted by
  * `previewPublicSchemaRuleExpression`. Matches the `property_mappings[]` item
- * shape in the mapping document (`source`, `target`, and optional `formula`).
+ * shape in the mapping document (`source`, `target`, optional `formula`, and
+ * optional `value_mappings`).
  */
 export interface PublicSchemaRule {
   source: string;
   target: string;
   formula?: unknown;
+  value_mappings?: PublicSchemaValueMapping[];
   id?: string;
+  rule_id?: string;
   required?: boolean;
   [key: string]: unknown;
 }

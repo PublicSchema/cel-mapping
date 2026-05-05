@@ -95,31 +95,51 @@ fn greater_than_or_equal_missing_field_errors() {
 #[test]
 fn present_missing_field_returns_false() {
     let result = eval_empty("present(source.given_name)").unwrap();
-    assert_eq!(result, json!(false), "present() on missing field should return false");
+    assert_eq!(
+        result,
+        json!(false),
+        "present() on missing field should return false"
+    );
 }
 
 #[test]
 fn coalesce_missing_field_returns_fallback() {
     let result = eval_empty(r#"coalesce(source.a, "fallback")"#).unwrap();
-    assert_eq!(result, json!("fallback"), "coalesce() should return fallback for missing field");
+    assert_eq!(
+        result,
+        json!("fallback"),
+        "coalesce() should return fallback for missing field"
+    );
 }
 
 #[test]
 fn default_missing_field_returns_fallback() {
     let result = eval_empty(r#"default(source.a, "fallback")"#).unwrap();
-    assert_eq!(result, json!("fallback"), "default() should return fallback for missing field");
+    assert_eq!(
+        result,
+        json!("fallback"),
+        "default() should return fallback for missing field"
+    );
 }
 
 #[test]
 fn blank_missing_field_returns_true() {
     let result = eval_empty("blank(source.a)").unwrap();
-    assert_eq!(result, json!(true), "blank() should return true for missing field");
+    assert_eq!(
+        result,
+        json!(true),
+        "blank() should return true for missing field"
+    );
 }
 
 #[test]
 fn missing_helper_missing_field_returns_true() {
     let result = eval_empty("missing(source.a)").unwrap();
-    assert_eq!(result, json!(true), "missing() should return true for missing field");
+    assert_eq!(
+        result,
+        json!(true),
+        "missing() should return true for missing field"
+    );
 }
 
 #[test]
@@ -171,20 +191,13 @@ fn strict_access_first_then_present_errors() {
 
 #[test]
 fn comparison_present_field_works() {
-    let result = eval_with_source(
-        r#"source.given_name != """#,
-        json!({"given_name": "Alice"}),
-    )
-    .unwrap();
+    let result =
+        eval_with_source(r#"source.given_name != """#, json!({"given_name": "Alice"})).unwrap();
     assert_eq!(result, json!(true));
 }
 
 #[test]
 fn comparison_empty_string_present_field_works() {
-    let result = eval_with_source(
-        r#"source.given_name != """#,
-        json!({"given_name": ""}),
-    )
-    .unwrap();
+    let result = eval_with_source(r#"source.given_name != """#, json!({"given_name": ""})).unwrap();
     assert_eq!(result, json!(false));
 }

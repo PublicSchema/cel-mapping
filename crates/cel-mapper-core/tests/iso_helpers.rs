@@ -23,22 +23,34 @@ fn eval(expr: &str) -> Result<JsonValue, StandaloneEvalError> {
 // iso3166-alpha3
 #[test]
 fn code_normalize_iso3166_alpha2_to_alpha3() {
-    assert_eq!(eval(r#"code_normalize("iso3166-alpha3", "KE")"#).unwrap(), json!("KEN"));
+    assert_eq!(
+        eval(r#"code_normalize("iso3166-alpha3", "KE")"#).unwrap(),
+        json!("KEN")
+    );
 }
 
 #[test]
 fn code_normalize_iso3166_us() {
-    assert_eq!(eval(r#"code_normalize("iso3166-alpha3", "US")"#).unwrap(), json!("USA"));
+    assert_eq!(
+        eval(r#"code_normalize("iso3166-alpha3", "US")"#).unwrap(),
+        json!("USA")
+    );
 }
 
 #[test]
 fn code_normalize_iso3166_already_alpha3_identity() {
-    assert_eq!(eval(r#"code_normalize("iso3166-alpha3", "KEN")"#).unwrap(), json!("KEN"));
+    assert_eq!(
+        eval(r#"code_normalize("iso3166-alpha3", "KEN")"#).unwrap(),
+        json!("KEN")
+    );
 }
 
 #[test]
 fn code_normalize_iso3166_lowercase_input() {
-    assert_eq!(eval(r#"code_normalize("iso3166-alpha3", "ke")"#).unwrap(), json!("KEN"));
+    assert_eq!(
+        eval(r#"code_normalize("iso3166-alpha3", "ke")"#).unwrap(),
+        json!("KEN")
+    );
 }
 
 #[test]
@@ -53,17 +65,26 @@ fn code_normalize_iso3166_unknown_code_errors() {
 // iso4217
 #[test]
 fn code_normalize_iso4217_uppercase_passthrough() {
-    assert_eq!(eval(r#"code_normalize("iso4217", "USD")"#).unwrap(), json!("USD"));
+    assert_eq!(
+        eval(r#"code_normalize("iso4217", "USD")"#).unwrap(),
+        json!("USD")
+    );
 }
 
 #[test]
 fn code_normalize_iso4217_lowercase_normalizes() {
-    assert_eq!(eval(r#"code_normalize("iso4217", "eur")"#).unwrap(), json!("EUR"));
+    assert_eq!(
+        eval(r#"code_normalize("iso4217", "eur")"#).unwrap(),
+        json!("EUR")
+    );
 }
 
 #[test]
 fn code_normalize_iso4217_kes() {
-    assert_eq!(eval(r#"code_normalize("iso4217", "KES")"#).unwrap(), json!("KES"));
+    assert_eq!(
+        eval(r#"code_normalize("iso4217", "KES")"#).unwrap(),
+        json!("KES")
+    );
 }
 
 #[test]
@@ -78,17 +99,26 @@ fn code_normalize_iso4217_unknown_errors() {
 // iso639-3
 #[test]
 fn code_normalize_iso639_alpha2_to_alpha3() {
-    assert_eq!(eval(r#"code_normalize("iso639-3", "en")"#).unwrap(), json!("eng"));
+    assert_eq!(
+        eval(r#"code_normalize("iso639-3", "en")"#).unwrap(),
+        json!("eng")
+    );
 }
 
 #[test]
 fn code_normalize_iso639_sw_to_swa() {
-    assert_eq!(eval(r#"code_normalize("iso639-3", "sw")"#).unwrap(), json!("swa"));
+    assert_eq!(
+        eval(r#"code_normalize("iso639-3", "sw")"#).unwrap(),
+        json!("swa")
+    );
 }
 
 #[test]
 fn code_normalize_iso639_already_alpha3_identity() {
-    assert_eq!(eval(r#"code_normalize("iso639-3", "eng")"#).unwrap(), json!("eng"));
+    assert_eq!(
+        eval(r#"code_normalize("iso639-3", "eng")"#).unwrap(),
+        json!("eng")
+    );
 }
 
 #[test]
@@ -106,7 +136,10 @@ fn code_normalize_iso639_unknown_errors() {
 
 #[test]
 fn code_normalize_one_arg_trims_and_lowercases() {
-    assert_eq!(eval(r#"code_normalize("  Hello World  ")"#).unwrap(), json!("hello world"));
+    assert_eq!(
+        eval(r#"code_normalize("  Hello World  ")"#).unwrap(),
+        json!("hello world")
+    );
 }
 
 #[test]

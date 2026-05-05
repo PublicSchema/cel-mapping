@@ -1,0 +1,40 @@
+{
+  "name": "value-mapping-reverse-ambiguous",
+  "mapping": {
+    "version": "0.2",
+    "id": "value-mapping-reverse-ambiguous",
+    "property_mappings": [
+      {
+        "id": "local-code",
+        "source": "/local_code",
+        "target": "/canonical",
+        "value_mappings": [
+          {
+            "source_value": "A",
+            "target_value": "shared"
+          },
+          {
+            "source_value": "B",
+            "target_value": "shared"
+          }
+        ]
+      }
+    ]
+  },
+  "direction": "from_target",
+  "source_data": {
+    "canonical": "shared"
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": false,
+    "output": {},
+    "errors_count": 1,
+    "warnings_count": 0,
+    "log_statuses": ["value_unmapped"]
+  }
+}

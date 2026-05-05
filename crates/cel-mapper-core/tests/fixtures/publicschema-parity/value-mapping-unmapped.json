@@ -1,0 +1,36 @@
+{
+  "name": "value-mapping-unmapped",
+  "mapping": {
+    "version": "0.2",
+    "id": "value-mapping-unmapped",
+    "property_mappings": [
+      {
+        "id": "sex",
+        "source": "/sex",
+        "target": "/sex",
+        "value_mappings": [
+          {
+            "source_value": "M",
+            "target_value": "male"
+          }
+        ]
+      }
+    ]
+  },
+  "direction": "to_target",
+  "source_data": {
+    "sex": "U"
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": false,
+    "output": {},
+    "errors_count": 1,
+    "warnings_count": 0,
+    "log_statuses": ["value_unmapped"]
+  }
+}

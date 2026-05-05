@@ -132,6 +132,7 @@ Runtime-significant fields:
 - `source`: JSON Pointer into the input record.
 - `target`: JSON Pointer into the output record.
 - `formula`: optional CEL expression by direction.
+- `value_mappings`: optional crosswalk rows applied after formula/identity evaluation. Forward execution maps `source_value` to `target_value`; reverse execution maps `target_value` back to `source_value`.
 - `direction`: optional authoring metadata. Execution chooses a concrete direction.
 - `quality`: copied into logs and diagnostics.
 - `required`: optional boolean controlling missing/error behavior.
@@ -385,6 +386,7 @@ Rule log status values SHOULD include:
 - `omitted`
 - `missing`
 - `skipped`
+- `value_unmapped`
 - `formula_error`
 - `write_error`
 - `validation_error`
@@ -392,6 +394,7 @@ Rule log status values SHOULD include:
 Status precedence:
 
 - `formula_error`: CEL compile/evaluation failed, including helper-thrown validation functions such as `require(...)` or `validate.required(...)`.
+- `value_unmapped`: a `value_mappings` crosswalk had no row for the resolved scalar value, or reverse execution found multiple source values for the same target value.
 - `write_error`: expression succeeded but target JSON Pointer write failed.
 - `validation_error`: reserved for future post-transform validation failures attached to a rule, not for CEL helper failures.
 

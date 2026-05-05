@@ -29,7 +29,10 @@ fn err_fn(name: &str, m: impl ToString) -> ExecutionError {
 fn arity_error(name: &str, expected: usize, got: usize) -> ExecutionError {
     err_fn(
         name,
-        format!("expected {expected} argument{s}, got {got}", s = if expected == 1 { "" } else { "s" }),
+        format!(
+            "expected {expected} argument{s}, got {got}",
+            s = if expected == 1 { "" } else { "s" }
+        ),
     )
 }
 
@@ -304,7 +307,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("text_trim", 1, args.len()));
             }
-            Ok(Value::String(Arc::new(str_from(&args[0])?.trim().to_string())))
+            Ok(Value::String(Arc::new(
+                str_from(&args[0])?.trim().to_string(),
+            )))
         },
     );
     ctx.add_function(
@@ -313,7 +318,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("text_lower", 1, args.len()));
             }
-            Ok(Value::String(Arc::new(str_from(&args[0])?.to_ascii_lowercase())))
+            Ok(Value::String(Arc::new(
+                str_from(&args[0])?.to_ascii_lowercase(),
+            )))
         },
     );
     ctx.add_function(
@@ -322,7 +329,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("text_upper", 1, args.len()));
             }
-            Ok(Value::String(Arc::new(str_from(&args[0])?.to_ascii_uppercase())))
+            Ok(Value::String(Arc::new(
+                str_from(&args[0])?.to_ascii_uppercase(),
+            )))
         },
     );
     ctx.add_function(
@@ -573,7 +582,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             let g = match &args[2] {
                 Value::Int(i) => usize::try_from((*i).max(0)).unwrap_or(0),
                 Value::UInt(u) => *u as usize,
-                _ => return Err(err_fn("text_regex_extract", "third argument must be an integer")),
+                _ => {
+                    return Err(err_fn(
+                        "text_regex_extract",
+                        "third argument must be an integer",
+                    ))
+                }
             };
             match re.captures(&s) {
                 None => Ok(Value::String(Arc::new(String::new()))),
@@ -827,7 +841,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             let days = match &args[1] {
                 Value::Int(i) => *i,
                 Value::UInt(u) => *u as i64,
-                _ => return Err(err_fn("date_add_days", "second argument must be an integer")),
+                _ => {
+                    return Err(err_fn(
+                        "date_add_days",
+                        "second argument must be an integer",
+                    ))
+                }
             };
             let out = nd
                 .checked_add_signed(Duration::days(days))
@@ -846,7 +865,12 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             let months = match &args[1] {
                 Value::Int(i) => *i,
                 Value::UInt(u) => *u as i64,
-                _ => return Err(err_fn("date_add_months", "second argument must be an integer")),
+                _ => {
+                    return Err(err_fn(
+                        "date_add_months",
+                        "second argument must be an integer",
+                    ))
+                }
             };
             let out =
                 add_months_safe(nd, months).ok_or_else(|| err_fn("date_add_months", "overflow"))?;
@@ -1426,10 +1450,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() % 2 != 0 {
                 return Err(err_fn(
                     "map_of",
-                    format!(
-                        "expected an even number of arguments, got {}",
-                        args.len()
-                    ),
+                    format!("expected an even number of arguments, got {}", args.len()),
                 ));
             }
             let mut out = std::collections::HashMap::new();
@@ -1605,9 +1626,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                             format!("unknown code system: {system}"),
                         ));
                     }
-                    let entry = creg8
-                        .map(&system, &value)
-                        .ok_or_else(|| err_fn("code_normalize", format!("unknown code: {value}")))?;
+                    let entry = creg8.map(&system, &value).ok_or_else(|| {
+                        err_fn("code_normalize", format!("unknown code: {value}"))
+                    })?;
                     Ok(Value::String(Arc::new(entry.id.clone())))
                 }
                 n => Err(err_fn(
@@ -1968,7 +1989,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("address_postal_code", 1, args.len()));
             }
-            Ok(Value::String(Arc::new(str_from(&args[0])?.trim().to_string())))
+            Ok(Value::String(Arc::new(
+                str_from(&args[0])?.trim().to_string(),
+            )))
         },
     );
 

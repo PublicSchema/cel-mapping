@@ -46,6 +46,7 @@ accurate.
 | `defaulted` | Source path absent (optional); no output written. Spec vocabulary: `applied\|defaulted\|skipped`. |
 | `missing` | Required source missing; error raised |
 | `skipped` | No source path declared for this rule |
+| `value_unmapped` | `value_mappings` crosswalk had no deterministic row for the resolved value |
 | `formula_error` | CEL compile/eval failure or wrong-direction formula |
 | `write_error` | Expression succeeded but target pointer write failed |
 | `validation_error` | Reserved for post-transform validation failures |
@@ -75,3 +76,5 @@ runtime and the runtime behavior is correct per spec, update the fixture.
 | `duplicate-target-last-write.json` | Two rules write same target; last wins; one authoring warning |
 | `ctx-timezone.json` | Formula reads `ctx.timezone`; caller-supplied value reaches expression |
 | `code-map-preloaded.json` | Mapping-local `code_systems` block; `code_map_or_default` lookup works |
+| `value-mapping-unmapped.json` | `value_mappings` misses a forward source value and fails closed |
+| `value-mapping-reverse-ambiguous.json` | Reverse `value_mappings` target collision fails closed |

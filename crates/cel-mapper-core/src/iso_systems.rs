@@ -20,8 +20,8 @@ pub fn load_iso_systems(registry: &mut CodeSystemRegistry) {
         ("iso4217", ISO4217_YAML),
         ("iso639-3", ISO639_3_YAML),
     ] {
-        let v: serde_yaml::Value = serde_yaml::from_str(yaml)
-            .expect("bundled ISO YAML is well-formed");
+        let v: serde_yaml::Value =
+            serde_yaml::from_str(yaml).expect("bundled ISO YAML is well-formed");
         registry
             .merge_yaml_value(name, &v)
             .expect("bundled ISO YAML has no alias collisions");

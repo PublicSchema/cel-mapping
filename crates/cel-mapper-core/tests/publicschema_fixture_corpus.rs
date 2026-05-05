@@ -96,9 +96,7 @@ fn load_fixtures() -> Vec<Fixture> {
             "debug" => PrivacyMode::Debug,
             _ => PrivacyMode::Production,
         };
-        let errors_mode = v["options"]["errors_mode"]
-            .as_str()
-            .map(|s| s.to_string());
+        let errors_mode = v["options"]["errors_mode"].as_str().map(|s| s.to_string());
 
         let expected_ok = v["expected"]["ok"]
             .as_bool()
@@ -106,10 +104,12 @@ fn load_fixtures() -> Vec<Fixture> {
         let expected_output = v["expected"]["output"].clone();
         let errors_count = v["expected"]["errors_count"]
             .as_u64()
-            .unwrap_or_else(|| panic!("missing expected.errors_count in {name}")) as usize;
+            .unwrap_or_else(|| panic!("missing expected.errors_count in {name}"))
+            as usize;
         let warnings_count = v["expected"]["warnings_count"]
             .as_u64()
-            .unwrap_or_else(|| panic!("missing expected.warnings_count in {name}")) as usize;
+            .unwrap_or_else(|| panic!("missing expected.warnings_count in {name}"))
+            as usize;
         let log_statuses: Vec<String> = v["expected"]["log_statuses"]
             .as_array()
             .unwrap_or_else(|| panic!("missing expected.log_statuses in {name}"))
@@ -155,16 +155,14 @@ fn run_all_fixtures() {
     let mut failures: Vec<String> = Vec::new();
 
     for fixture in &fixtures {
-        let compiled = match rt.compile_publicschema_mapping(&fixture.mapping_json, Default::default()) {
-            Ok(c) => c,
-            Err(e) => {
-                failures.push(format!(
-                    "[{}] compile failed: {e}",
-                    fixture.name
-                ));
-                continue;
-            }
-        };
+        let compiled =
+            match rt.compile_publicschema_mapping(&fixture.mapping_json, Default::default()) {
+                Ok(c) => c,
+                Err(e) => {
+                    failures.push(format!("[{}] compile failed: {e}", fixture.name));
+                    continue;
+                }
+            };
 
         let result = rt.evaluate_publicschema_mapping(
             &compiled,

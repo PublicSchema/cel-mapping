@@ -27,8 +27,7 @@ static ATTR_PATH: Lazy<Regex> = Lazy::new(|| {
 pub fn collect_missing_aware_injection_paths(
     programs: &[&cel::Program],
 ) -> Vec<(String, Vec<String>)> {
-    let mut all_missing_aware: std::collections::HashSet<String> =
-        std::collections::HashSet::new();
+    let mut all_missing_aware: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut all_strict: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for prog in programs {

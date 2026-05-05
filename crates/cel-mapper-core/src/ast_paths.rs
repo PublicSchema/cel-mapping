@@ -253,9 +253,7 @@ mod tests {
         // predicate references source.threshold in a comparison. The predicate
         // is per-iteration strict CEL semantics — source.threshold must NOT be
         // recorded as missing-aware just because the outer call is.
-        let paths = paths_for(
-            "coalesce(source.items.filter(x, x.value > source.threshold), [])",
-        );
+        let paths = paths_for("coalesce(source.items.filter(x, x.value > source.threshold), [])");
         assert!(
             !paths.contains("source.threshold"),
             "filter predicate must be strict regardless of enclosing helper: {paths:?}"

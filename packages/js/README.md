@@ -78,7 +78,27 @@ if (r.ok) console.log(r.value);
 else console.error(r.error);
 ```
 
-## Example 5 — low-level wasm (snake_case + strings)
+## Example 5 — PublicSchema value mappings
+
+```typescript
+import { CelMapper } from "cel-mapping-js";
+
+const mapper = await CelMapper.create();
+const result = mapper.evaluatePublicSchemaMapping(mappingYaml, { sex: "U" }, {}, {
+  errors_mode: "collect",
+  privacy: "authoring",
+});
+
+if (result.log.some((entry) => entry.status === "value_unmapped")) {
+  console.warn(result.errors);
+}
+```
+
+`PublicSchemaStatus` includes `value_unmapped`. The runtime uses it when a
+`value_mappings` crosswalk has no deterministic row, including ambiguous reverse
+lookups where multiple `source_value`s share the same `target_value`.
+
+## Example 6 — low-level wasm (snake_case + strings)
 
 ```typescript
 import { init, CelMapperWasm } from "cel-mapping-js";

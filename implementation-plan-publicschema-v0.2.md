@@ -302,6 +302,7 @@ Implement statuses:
 - `omitted`
 - `missing`
 - `skipped`
+- `value_unmapped`
 - `formula_error`
 - `write_error`
 - `validation_error`
@@ -309,6 +310,7 @@ Implement statuses:
 Acceptance:
 
 - Production privacy suppresses resolved values.
+- `value_mappings` misses and ambiguous reverse crosswalks produce rule diagnostics and `value_unmapped` statuses.
 - Authoring privacy includes resolved values only when requested.
 - Debug privacy includes full diagnostics.
 

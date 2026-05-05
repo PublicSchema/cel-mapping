@@ -171,14 +171,29 @@ struct RuntimeYaml {
 struct PropertyMappingYaml {
     #[serde(default)]
     id: Option<String>,
+    #[serde(default)]
+    rule_id: Option<String>,
     source: String,
     target: String,
     #[serde(default)]
     formula: Option<FormulaYaml>,
     #[serde(default)]
+    value_mappings: Vec<ValueMappingYaml>,
+    #[serde(default)]
     required: bool,
     #[serde(flatten)]
     extra: BTreeMap<String, JsonValue>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct ValueMappingYaml {
+    source_value: String,
+    #[serde(default)]
+    target_value: Option<String>,
+    #[serde(default)]
+    quality: Option<String>,
+    #[serde(default)]
+    ignored: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -247,6 +262,7 @@ pub fn compile_publicschema_mapping(
         validate_pointer(&pm.source, format!("property_mappings[{idx}].source"))?;
         validate_pointer(&pm.target, format!("property_mappings[{idx}].target"))?;
         validate_formula_entries(&pm.formula, idx)?;
+        validate_value_mappings(&pm.value_mappings, idx)?;
         let to_target = formula_expression(&pm.formula, PublicSchemaDirection::ToTarget)
             .filter(|expr| expr.trim() != "source")
             .map(|expr| {
@@ -336,7 +352,11 @@ pub fn evaluate_publicschema_mapping(
                 rule.from_target.as_ref(),
             ),
         };
-        let rule_id = rule.authored.id.as_deref();
+        let rule_id = rule
+            .authored
+            .id
+            .as_deref()
+            .or(rule.authored.rule_id.as_deref());
         let quality = rule_quality(rule);
         let expression_for_log = || selected_formula_source(rule, direction);
         if !written.insert(write_ptr.to_string()) {
@@ -460,6 +480,98 @@ pub fn evaluate_publicschema_mapping(
             continue;
         } else {
             resolved.clone()
+        };
+
+        let value = match apply_value_mappings(&rule.authored.value_mappings, direction, &value) {
+            ValueMappingOutcome::Mapped(mapped) => mapped,
+            ValueMappingOutcome::Ignored => {
+                push_log(
+                    &mut log,
+                    LogFields {
+                        index: idx,
+                        rule_id,
+                        source_path: read_ptr,
+                        target_path: write_ptr,
+                        status: "skipped",
+                        expression: expression_for_log(),
+                        resolved_input: Some(resolved.clone()),
+                        resolved_output: None,
+                        quality,
+                        issues: Vec::new(),
+                        privacy: input.options.privacy,
+                    },
+                );
+                continue;
+            }
+            ValueMappingOutcome::Unmapped => {
+                let value_role = match direction {
+                    PublicSchemaDirection::ToTarget => "source",
+                    PublicSchemaDirection::FromTarget => "target",
+                };
+                let err = MappingError::error(
+                    ErrorCode::ValidationError,
+                    format!(
+                        "no value_mapping row for {value_role} value {}",
+                        value_for_message(&value)
+                    ),
+                    Some(format!("property_mappings[{idx}].value_mappings")),
+                    expression_for_log(),
+                );
+                push_log(
+                    &mut log,
+                    LogFields {
+                        index: idx,
+                        rule_id,
+                        source_path: read_ptr,
+                        target_path: write_ptr,
+                        status: "value_unmapped",
+                        expression: expression_for_log(),
+                        resolved_input: Some(resolved.clone()),
+                        resolved_output: None,
+                        quality,
+                        issues: vec![err.clone()],
+                        privacy: input.options.privacy,
+                    },
+                );
+                if push_error(&mut errors, &mut warnings, err, mode) {
+                    break;
+                }
+                continue;
+            }
+            ValueMappingOutcome::AmbiguousReverse {
+                target_value,
+                source_values,
+            } => {
+                let err = MappingError::error(
+                    ErrorCode::ValidationError,
+                    format!(
+                        "ambiguous reverse value_mapping for target value {target_value:?}; matching source values: {}",
+                        source_values.join(", ")
+                    ),
+                    Some(format!("property_mappings[{idx}].value_mappings")),
+                    expression_for_log(),
+                );
+                push_log(
+                    &mut log,
+                    LogFields {
+                        index: idx,
+                        rule_id,
+                        source_path: read_ptr,
+                        target_path: write_ptr,
+                        status: "value_unmapped",
+                        expression: expression_for_log(),
+                        resolved_input: Some(resolved.clone()),
+                        resolved_output: None,
+                        quality,
+                        issues: vec![err.clone()],
+                        privacy: input.options.privacy,
+                    },
+                );
+                if push_error(&mut errors, &mut warnings, err, mode) {
+                    break;
+                }
+                continue;
+            }
         };
 
         if let Err(message) = write_pointer(&mut output, write_ptr, value.clone()) {
@@ -649,6 +761,25 @@ fn validate_formula_entries(formula: &Option<FormulaYaml>, idx: usize) -> Result
     Ok(())
 }
 
+fn validate_value_mappings(
+    value_mappings: &[ValueMappingYaml],
+    idx: usize,
+) -> Result<(), CompileError> {
+    for (row_idx, row) in value_mappings.iter().enumerate() {
+        if row.source_value.trim().is_empty() {
+            return Err(CompileError::Mapping(format!(
+                "property_mappings[{idx}].value_mappings[{row_idx}].source_value cannot be empty"
+            )));
+        }
+        if row.ignored && row.target_value.as_deref().is_some_and(|v| !v.is_empty()) {
+            return Err(CompileError::Mapping(format!(
+                "property_mappings[{idx}].value_mappings[{row_idx}] cannot be ignored and have target_value"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn formula_has_direction(formula: &Option<FormulaYaml>, direction: PublicSchemaDirection) -> bool {
     match formula {
         None => false,
@@ -746,6 +877,82 @@ fn eval_rule_expression(
     cel_to_json(&out)
 }
 
+enum ValueMappingOutcome {
+    Mapped(JsonValue),
+    Ignored,
+    Unmapped,
+    AmbiguousReverse {
+        target_value: String,
+        source_values: Vec<String>,
+    },
+}
+
+fn apply_value_mappings(
+    value_mappings: &[ValueMappingYaml],
+    direction: PublicSchemaDirection,
+    value: &JsonValue,
+) -> ValueMappingOutcome {
+    if value_mappings.is_empty() {
+        return ValueMappingOutcome::Mapped(value.clone());
+    }
+    let Some(value_key) = scalar_key(value) else {
+        return ValueMappingOutcome::Unmapped;
+    };
+    if direction == PublicSchemaDirection::FromTarget {
+        let mut matches = value_mappings
+            .iter()
+            .filter(|row| row.target_value.as_deref() == Some(value_key.as_str()));
+        let Some(first) = matches.next() else {
+            return ValueMappingOutcome::Unmapped;
+        };
+        let mut source_values = BTreeSet::from([first.source_value.clone()]);
+        for row in matches {
+            source_values.insert(row.source_value.clone());
+        }
+        if source_values.len() > 1 {
+            return ValueMappingOutcome::AmbiguousReverse {
+                target_value: value_key,
+                source_values: source_values.into_iter().collect(),
+            };
+        }
+        return ValueMappingOutcome::Mapped(JsonValue::String(first.source_value.clone()));
+    }
+
+    let matched = value_mappings
+        .iter()
+        .find(|row| row.source_value == value_key);
+    let Some(row) = matched else {
+        return ValueMappingOutcome::Unmapped;
+    };
+    if row.ignored {
+        return ValueMappingOutcome::Ignored;
+    }
+    match direction {
+        PublicSchemaDirection::ToTarget => row
+            .target_value
+            .as_ref()
+            .map(|target| ValueMappingOutcome::Mapped(JsonValue::String(target.clone())))
+            .unwrap_or(ValueMappingOutcome::Ignored),
+        PublicSchemaDirection::FromTarget => unreachable!("handled above"),
+    }
+}
+
+fn scalar_key(value: &JsonValue) -> Option<String> {
+    match value {
+        JsonValue::String(s) => Some(s.clone()),
+        JsonValue::Number(n) => Some(n.to_string()),
+        JsonValue::Bool(b) => Some(b.to_string()),
+        JsonValue::Null | JsonValue::Array(_) | JsonValue::Object(_) => None,
+    }
+}
+
+fn value_for_message(value: &JsonValue) -> String {
+    match value {
+        JsonValue::String(s) => format!("{s:?}"),
+        other => other.to_string(),
+    }
+}
+
 fn normalize_context(ctx: JsonValue) -> JsonValue {
     match ctx {
         JsonValue::Null => JsonValue::Object(Map::new()),
@@ -807,10 +1014,7 @@ fn push_log(log: &mut Vec<PublicSchemaRuleLogEntry>, fields: LogFields<'_>) {
 }
 
 fn rule_quality(rule: &CompiledPublicSchemaRule) -> Option<&str> {
-    rule.authored
-        .extra
-        .get("quality")
-        .and_then(|v| v.as_str())
+    rule.authored.extra.get("quality").and_then(|v| v.as_str())
 }
 
 fn read_pointer<'a>(value: &'a JsonValue, pointer: &str) -> Option<&'a JsonValue> {
@@ -965,9 +1169,11 @@ fn deterministic_hash(
         .map(|pm| {
             json!({
                 "id": pm.id,
+                "rule_id": pm.rule_id,
                 "source": pm.source,
                 "target": pm.target,
                 "formula": formula_json(&pm.formula),
+                "value_mappings": pm.value_mappings,
                 "required": pm.required,
                 "extra": pm.extra,
             })

@@ -8,12 +8,12 @@
 pub mod ast_paths;
 pub mod code_system;
 pub mod compiled;
-mod iso_systems;
 pub mod compiler;
 pub mod errors;
 pub mod eval_ctx;
 pub mod evaluator;
 pub mod expr;
+mod iso_systems;
 pub mod mapping;
 pub mod missing;
 pub mod output;

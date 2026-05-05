@@ -13,8 +13,7 @@ use crate::missing::{is_missing, MISSING_STR};
 use crate::output::{cel_to_json, omit_null_keys};
 use crate::paths::{
     augment_json_with_paths, augment_loop_element, build_binding_envelope,
-    collect_missing_aware_injection_paths,
-    collect_dotted_paths_with_roots, filter_paths_by_roots,
+    collect_dotted_paths_with_roots, collect_missing_aware_injection_paths, filter_paths_by_roots,
 };
 use cel::{Context, ExecutionError, Program, Value};
 use serde_json::{Map, Value as JsonValue};

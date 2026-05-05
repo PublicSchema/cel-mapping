@@ -60,6 +60,139 @@ property_mappings:
 }
 
 #[test]
+fn value_mappings_apply_source_to_target_crosswalk() {
+    let out = eval(
+        r#"
+version: "0.2"
+property_mappings:
+  - rule_id: sex
+    source: /sex
+    target: /sex
+    formula: source
+    quality: close
+    value_mappings:
+      - source_value: M
+        target_value: male
+        quality: exact
+      - source_value: F
+        target_value: female
+        quality: exact
+"#,
+        json!({"sex": "M"}),
+    );
+    assert!(out.errors.is_empty(), "{:?}", out.errors);
+    assert_eq!(out.output, json!({"sex": "male"}));
+    assert_eq!(out.log[0].rule_id.as_deref(), Some("sex"));
+    assert_eq!(out.log[0].quality.as_deref(), Some("close"));
+    assert_eq!(out.log[0].resolved_output, Some(json!("male")));
+}
+
+#[test]
+fn value_mappings_apply_target_to_source_crosswalk() {
+    let rt = MappingRuntime::new(RuntimeOptions::default());
+    let compiled = rt
+        .compile_publicschema_mapping(
+            r#"
+version: "0.2"
+property_mappings:
+  - source: /sex
+    target: /sex
+    value_mappings:
+      - source_value: M
+        target_value: male
+      - source_value: F
+        target_value: female
+"#,
+            Default::default(),
+        )
+        .unwrap();
+    let out = rt.evaluate_publicschema_mapping(
+        &compiled,
+        PublicSchemaEvaluationInput {
+            source: json!({"sex": "female"}),
+            context: json!({}),
+            options: PublicSchemaEvaluateOptions {
+                direction: PublicSchemaDirection::FromTarget,
+                privacy: PrivacyMode::Authoring,
+                ..Default::default()
+            },
+        },
+    );
+    assert!(out.errors.is_empty(), "{:?}", out.errors);
+    assert_eq!(out.output, json!({"sex": "F"}));
+}
+
+#[test]
+fn value_mappings_reverse_ambiguous_crosswalk_fails_closed() {
+    let rt = MappingRuntime::new(RuntimeOptions::default());
+    let compiled = rt
+        .compile_publicschema_mapping(
+            r#"
+version: "0.2"
+property_mappings:
+  - source: /local_code
+    target: /canonical
+    value_mappings:
+      - source_value: A
+        target_value: shared
+      - source_value: B
+        target_value: shared
+"#,
+            Default::default(),
+        )
+        .unwrap();
+    let out = rt.evaluate_publicschema_mapping(
+        &compiled,
+        PublicSchemaEvaluationInput {
+            source: json!({"canonical": "shared"}),
+            context: json!({}),
+            options: PublicSchemaEvaluateOptions {
+                direction: PublicSchemaDirection::FromTarget,
+                errors_mode: Some("collect".into()),
+                privacy: PrivacyMode::Authoring,
+            },
+        },
+    );
+    assert!(!out.ok);
+    assert_eq!(out.output, json!({}));
+    assert_eq!(out.log[0].status, "value_unmapped");
+    assert!(
+        out.log[0].issues[0]
+            .message
+            .contains("ambiguous reverse value_mapping"),
+        "{:?}",
+        out.log[0].issues
+    );
+    assert_eq!(out.errors[0].code, ErrorCode::ValidationError);
+    assert!(
+        out.errors[0]
+            .message
+            .contains("ambiguous reverse value_mapping"),
+        "{:?}",
+        out.errors
+    );
+}
+
+#[test]
+fn unmapped_value_mapping_value_fails_closed() {
+    let out = eval(
+        r#"
+version: "0.2"
+property_mappings:
+  - source: /sex
+    target: /sex
+    value_mappings:
+      - source_value: M
+        target_value: male
+"#,
+        json!({"sex": "U"}),
+    );
+    assert!(!out.ok);
+    assert_eq!(out.output, json!({}));
+    assert_eq!(out.log[0].status, "value_unmapped");
+}
+
+#[test]
 fn formula_resolves_source_root_and_target_alias_in_to_target_direction() {
     // Spec §6.1: ToTarget (external→profile) binds `target` to root; `profile` is absent.
     let out = eval(
@@ -355,7 +488,10 @@ property_mappings:
             },
         },
     );
-    assert!(!out.ok, "profile alias must not be defined in ToTarget direction");
+    assert!(
+        !out.ok,
+        "profile alias must not be defined in ToTarget direction"
+    );
     assert_eq!(out.log[0].status, "formula_error");
 }
 
