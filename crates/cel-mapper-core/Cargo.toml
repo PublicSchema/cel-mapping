@@ -3,6 +3,7 @@ name = "cel-mapper-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "CEL-based declarative mapping runtime (spec v0.1)"
 
 [dependencies]

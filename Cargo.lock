@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "cel-mapper-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64",
  "cel",
@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "cel-mapper-python"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cel-mapper-core",
  "pyo3",
@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "cel-mapper-wasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cel-mapper-core",
  "serde",

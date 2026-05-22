@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "cel-mapping"
-version = "0.1.0"
+version = "0.1.1"
 description = "CEL mapping runtime (PyO3 bindings to cel-mapper-core)"
 requires-python = ">=3.10"
 

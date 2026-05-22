@@ -5,6 +5,7 @@ name = "cel-mapper-python"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 
 # PyO3 `create_exception!` expands cfg from an older pyo3 pattern; harmless on current nightly check-cfg.
 [lints.rust]
