@@ -122,18 +122,18 @@ def test_wrong_direction_formula_error():
 
 
 # ---------------------------------------------------------------------------
-# 4. Missing optional field → ``omitted``
+# 4. Missing optional field → ``defaulted``
 # ---------------------------------------------------------------------------
 
 
-def test_missing_optional_omitted():
+def test_missing_optional_defaulted():
     rt = MappingRuntime()
     compiled = rt.compile_publicschema_mapping(SIMPLE_MAPPING)
     # Provide family_name (required), omit given_name (optional).
     out = rt.evaluate_publicschema_compiled(compiled, {"family_name": "Jones"})
     assert out["ok"] is True
     given_name_log = next(e for e in out["log"] if e["source_path"] == "/given_name")
-    assert given_name_log["status"] == "omitted"
+    assert given_name_log["status"] == "defaulted"
 
 
 # ---------------------------------------------------------------------------

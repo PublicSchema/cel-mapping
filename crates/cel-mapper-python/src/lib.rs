@@ -36,6 +36,9 @@ fn py_compile_err(e: CompileError) -> PyErr {
 fn py_standalone_eval_err(e: StandaloneEvalError) -> PyErr {
     match e {
         StandaloneEvalError::Compile(c) => py_compile_err(c),
+        StandaloneEvalError::InvalidBindingName { name, message } => {
+            PyTypeError::new_err(format!("invalid root binding name `{name}`: {message}"))
+        }
         StandaloneEvalError::Evaluate {
             message,
             expression,
