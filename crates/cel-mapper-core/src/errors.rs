@@ -170,6 +170,8 @@ impl ExpressionPreviewResult {
 pub enum StandaloneEvalError {
     #[error(transparent)]
     Compile(#[from] CompileError),
+    #[error("invalid root binding name `{name}`: {message}")]
+    InvalidBindingName { name: String, message: String },
     #[error("evaluation failed: {message}\nexpression: {expression}")]
     Evaluate { message: String, expression: String },
 }

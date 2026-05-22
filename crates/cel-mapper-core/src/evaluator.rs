@@ -16,9 +16,36 @@ use crate::paths::{
     collect_dotted_paths_with_roots, collect_missing_aware_injection_paths, filter_paths_by_roots,
 };
 use cel::{Context, ExecutionError, Program, Value};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use std::collections::BTreeMap;
 use std::sync::Arc;
+
+/// Root bindings for standalone CEL expression evaluation.
+///
+/// Each entry is exposed as a top-level CEL variable. For example, a binding named
+/// `patient` lets expressions read `patient.name` directly.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StandaloneExpressionInput {
+    #[serde(default)]
+    pub root_bindings: BTreeMap<String, JsonValue>,
+}
+
+impl StandaloneExpressionInput {
+    pub fn new(root_bindings: BTreeMap<String, JsonValue>) -> Self {
+        Self { root_bindings }
+    }
+
+    pub fn from_source_context(source: JsonValue, context: JsonValue) -> Self {
+        let mut root_bindings = BTreeMap::new();
+        root_bindings.insert("source".to_string(), source.clone());
+        root_bindings.insert("root".to_string(), source);
+        root_bindings.insert("ctx".to_string(), context);
+        root_bindings.insert("vars".to_string(), JsonValue::Object(Map::new()));
+        root_bindings.insert("item".to_string(), JsonValue::Null);
+        Self { root_bindings }
+    }
+}
 
 pub fn evaluate_mapping(
     mapping: &CompiledMapping,
@@ -721,6 +748,23 @@ pub(crate) fn run_program(
     cel.program.execute(&c)
 }
 
+fn run_program_with_root_bindings(
+    cel: &CompiledCel,
+    root_bindings: &BTreeMap<String, Value>,
+    extra_bindings: &[(&str, Value)],
+    codes: &Arc<crate::code_system::CodeSystemRegistry>,
+) -> Result<Value, ExecutionError> {
+    let mut c = Context::default();
+    register_stdlib(&mut c, Arc::clone(codes));
+    for (name, value) in root_bindings {
+        c.add_variable_from_value(name.as_str(), value.clone());
+    }
+    for (name, value) in extra_bindings {
+        c.add_variable_from_value(*name, value.clone());
+    }
+    cel.program.execute(&c)
+}
+
 /// `path_suffix` is the last segment after `records.{record}.` (e.g. `fields.foo`, `when`, `vars.x`).
 fn exec_validation_err(path: &str, expr: &str, message: &str, e: ExecutionError) -> MappingError {
     mapping_err_with_expr(
@@ -776,27 +820,33 @@ pub fn evaluate_cel_expression(
     limits: &crate::security::SecurityLimits,
     codes: Arc<crate::code_system::CodeSystemRegistry>,
 ) -> Result<JsonValue, StandaloneEvalError> {
+    evaluate_cel_expression_with_input(
+        expr,
+        StandaloneExpressionInput::from_source_context(source, ctx),
+        limits,
+        codes,
+    )
+}
+
+/// Evaluate one mapping-stdlib CEL expression against arbitrary root bindings.
+///
+/// Binding names must be valid CEL-style identifiers. Dotted paths used only in missing-aware
+/// helper arguments receive the same Missing sentinel treatment as full mappings.
+pub fn evaluate_cel_expression_with_input(
+    expr: &str,
+    input: StandaloneExpressionInput,
+    limits: &crate::security::SecurityLimits,
+    codes: Arc<crate::code_system::CodeSystemRegistry>,
+) -> Result<JsonValue, StandaloneEvalError> {
+    validate_root_bindings(&input.root_bindings)?;
     let cel = crate::compiler::compile_expr(expr, limits, "expression".into())?;
     let paths = collect_missing_aware_injection_paths(&[&cel.program]);
-    let (src_json, root_json, ctx_json) = build_binding_envelope(source, ctx, &paths, MISSING_STR);
-    let source_val = json_to_cel(&src_json);
-    let root_val = json_to_cel(&root_json);
-    let ctx_val = json_to_cel(&ctx_json);
-    let v = run_program(
-        &cel,
-        &source_val,
-        &root_val,
-        &ctx_val,
-        &empty_vars(),
-        None,
-        None,
-        None,
-        &[],
-        &codes,
-    )
-    .map_err(|e| StandaloneEvalError::Evaluate {
-        message: e.to_string(),
-        expression: cel.source.clone(),
+    let root_bindings = prepare_root_bindings(input.root_bindings, &paths);
+    let v = run_program_with_root_bindings(&cel, &root_bindings, &[], &codes).map_err(|e| {
+        StandaloneEvalError::Evaluate {
+            message: e.to_string(),
+            expression: cel.source.clone(),
+        }
     })?;
     cel_to_json(&v).map_err(|m| StandaloneEvalError::Evaluate {
         message: m,
@@ -843,7 +893,27 @@ pub fn preview_cel_expression(
     limits: &crate::security::SecurityLimits,
     codes: Arc<crate::code_system::CodeSystemRegistry>,
 ) -> ExpressionPreviewResult {
+    preview_cel_expression_with_input(
+        expr,
+        StandaloneExpressionInput::from_source_context(source, ctx),
+        limits,
+        codes,
+    )
+}
+
+/// Compile and evaluate one expression against arbitrary root bindings, returning structured
+/// diagnostics instead of `Err`.
+pub fn preview_cel_expression_with_input(
+    expr: &str,
+    input: StandaloneExpressionInput,
+    limits: &crate::security::SecurityLimits,
+    codes: Arc<crate::code_system::CodeSystemRegistry>,
+) -> ExpressionPreviewResult {
     let author = expr.to_string();
+
+    if let Err(issue) = validate_root_bindings_for_preview(&input.root_bindings, &author) {
+        return ExpressionPreviewResult::from_parts(author, None, vec![issue]);
+    }
 
     if let Err(m) = limits.check_expr(expr) {
         return ExpressionPreviewResult::from_parts(
@@ -878,23 +948,9 @@ pub fn preview_cel_expression(
     };
 
     let paths = collect_missing_aware_injection_paths(&[&cel.program]);
-    let (src_json, root_json, ctx_json) = build_binding_envelope(source, ctx, &paths, MISSING_STR);
-    let source_val = json_to_cel(&src_json);
-    let root_val = json_to_cel(&root_json);
-    let ctx_val = json_to_cel(&ctx_json);
+    let root_bindings = prepare_root_bindings(input.root_bindings, &paths);
 
-    let v = match run_program(
-        &cel,
-        &source_val,
-        &root_val,
-        &ctx_val,
-        &empty_vars(),
-        None,
-        None,
-        None,
-        &[],
-        &codes,
-    ) {
+    let v = match run_program_with_root_bindings(&cel, &root_bindings, &[], &codes) {
         Ok(v) => v,
         Err(e) => {
             return ExpressionPreviewResult::from_parts(
@@ -934,4 +990,71 @@ pub fn preview_cel_expression(
             }],
         ),
     }
+}
+
+fn prepare_root_bindings(
+    root_bindings: BTreeMap<String, JsonValue>,
+    paths: &[(String, Vec<String>)],
+) -> BTreeMap<String, Value> {
+    let mut env = JsonValue::Object(root_bindings.into_iter().collect());
+    augment_json_with_paths(&mut env, paths, MISSING_STR);
+    match env {
+        JsonValue::Object(m) => m.into_iter().map(|(k, v)| (k, json_to_cel(&v))).collect(),
+        _ => BTreeMap::new(),
+    }
+}
+
+fn validate_root_bindings(
+    root_bindings: &BTreeMap<String, JsonValue>,
+) -> Result<(), StandaloneEvalError> {
+    for name in root_bindings.keys() {
+        if let Err(message) = validate_root_binding_name(name) {
+            return Err(StandaloneEvalError::InvalidBindingName {
+                name: name.clone(),
+                message,
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_root_bindings_for_preview(
+    root_bindings: &BTreeMap<String, JsonValue>,
+    expression: &str,
+) -> Result<(), ExpressionIssue> {
+    for name in root_bindings.keys() {
+        if let Err(message) = validate_root_binding_name(name) {
+            return Err(ExpressionIssue {
+                phase: ExpressionPhase::Evaluation,
+                severity: crate::errors::ErrorSeverity::Error,
+                code: ErrorCode::EvaluationError,
+                message: format!("invalid root binding name `{name}`: {message}"),
+                line: None,
+                column: None,
+                expression: expression.to_string(),
+                source_path: None,
+            });
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_root_binding_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("name must not be empty".to_string());
+    }
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return Err("name must not be empty".to_string());
+    };
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return Err("name must start with an ASCII letter or underscore".to_string());
+    }
+    if !chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric()) {
+        return Err("name may only contain ASCII letters, digits, and underscores".to_string());
+    }
+    if matches!(name, "true" | "false" | "null" | "in") {
+        return Err("name is reserved by CEL".to_string());
+    }
+    Ok(())
 }

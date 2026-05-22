@@ -4,7 +4,10 @@ use crate::compiled::CompiledMapping;
 use crate::compiler::compile_mapping_yaml;
 use crate::errors::{CompileError, ExpressionPreviewResult, StandaloneEvalError};
 use crate::eval_ctx::{clear_eval_ctx, clear_warnings, set_eval_ctx, take_warnings};
-use crate::evaluator::{evaluate_cel_expression, evaluate_mapping};
+use crate::evaluator::{
+    evaluate_cel_expression, evaluate_cel_expression_with_input, evaluate_mapping,
+    StandaloneExpressionInput,
+};
 use crate::publicschema::{
     CompiledPublicSchemaMapping, PublicSchemaCompileOptions, PublicSchemaDirection,
     PublicSchemaEvaluationInput, PublicSchemaTransformOutput,
@@ -215,6 +218,24 @@ impl MappingRuntime {
         out
     }
 
+    /// Evaluate a single mapping-stdlib CEL expression against arbitrary root bindings.
+    pub fn evaluate_cel_expression_with_input(
+        &self,
+        expr: &str,
+        mut input: StandaloneExpressionInput,
+    ) -> Result<JsonValue, StandaloneEvalError> {
+        clear_warnings();
+        let ctx = self.prepare_standalone_context(&mut input);
+        set_eval_ctx(ctx);
+        let _budget = BudgetGuard::install(Arc::new(self.limits.clone()));
+        let codes = Arc::new(self.code_systems.clone());
+        let out = evaluate_cel_expression_with_input(expr, input, &self.limits, codes);
+        drop(_budget);
+        clear_eval_ctx();
+        let _ = take_warnings();
+        out
+    }
+
     /// Like [`Self::evaluate_cel_expression`], but always returns an [`ExpressionPreviewResult`]
     /// with structured issues (syntax **line/column** from `cel`, evaluation errors, limits).
     pub fn preview_cel_expression(
@@ -247,5 +268,49 @@ impl MappingRuntime {
         clear_eval_ctx();
         let _ = take_warnings();
         out
+    }
+
+    /// Like [`Self::evaluate_cel_expression_with_input`], but returns structured preview
+    /// diagnostics instead of `Err`.
+    pub fn preview_cel_expression_with_input(
+        &self,
+        expr: &str,
+        mut input: StandaloneExpressionInput,
+    ) -> ExpressionPreviewResult {
+        clear_warnings();
+        let ctx = self.prepare_standalone_context(&mut input);
+        set_eval_ctx(ctx);
+        let _budget = BudgetGuard::install(Arc::new(self.limits.clone()));
+        let codes = Arc::new(self.code_systems.clone());
+        let out =
+            crate::evaluator::preview_cel_expression_with_input(expr, input, &self.limits, codes);
+        drop(_budget);
+        clear_eval_ctx();
+        let _ = take_warnings();
+        out
+    }
+
+    fn prepare_standalone_context(&self, input: &mut StandaloneExpressionInput) -> JsonValue {
+        let raw_ctx = input
+            .root_bindings
+            .remove("ctx")
+            .unwrap_or_else(|| JsonValue::Object(Default::default()));
+        let mut ctx = match raw_ctx {
+            JsonValue::Object(m) => JsonValue::Object(m),
+            JsonValue::Null => JsonValue::Object(Default::default()),
+            other => JsonValue::Object(serde_json::Map::from_iter([("value".to_string(), other)])),
+        };
+        if let JsonValue::Object(ref mut m) = ctx {
+            if let Some(tz) = &self.options.timezone {
+                m.entry("timezone".to_string())
+                    .or_insert_with(|| JsonValue::String(tz.clone()));
+            }
+            if let Some(loc) = &self.options.locale {
+                m.entry("locale".to_string())
+                    .or_insert_with(|| JsonValue::String(loc.clone()));
+            }
+        }
+        input.root_bindings.insert("ctx".to_string(), ctx.clone());
+        ctx
     }
 }
