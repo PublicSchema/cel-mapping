@@ -15,4 +15,4 @@ default-members = [
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/204-programs-delivery-commons"
+repository = "https://github.com/PublicSchema/cel-mapping"
