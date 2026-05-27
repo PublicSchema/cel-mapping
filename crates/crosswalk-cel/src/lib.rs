@@ -6,7 +6,7 @@
 //! It intentionally does not depend on `crosswalk-core` or
 //! `crosswalk-publicschema`; those crates call this boundary instead.
 
-pub mod ast_paths;
+mod ast_paths;
 mod cel_scan;
 pub mod compiled;
 pub mod compiler;

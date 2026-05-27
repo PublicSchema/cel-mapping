@@ -1,5 +1,3 @@
-use cel::Program;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ErrorMode {
     Strict,
@@ -20,6 +18,12 @@ impl ErrorMode {
 /// Compiled CEL program plus the authored expression source.
 #[derive(Debug)]
 pub struct CompiledCel {
-    pub program: Program,
+    pub(crate) program: cel::Program,
     pub source: String,
+}
+
+impl CompiledCel {
+    pub fn source(&self) -> &str {
+        &self.source
+    }
 }

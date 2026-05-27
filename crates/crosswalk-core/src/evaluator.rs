@@ -4,17 +4,17 @@
 use crate::compiled::CompiledCel;
 use crate::compiled::{CompiledMapping, CompiledRecord, ErrorMode};
 use crate::errors::{ErrorCode, ExpressionPreviewResult, MappingError, StandaloneEvalError};
-use crate::functions::register_stdlib;
 use crate::mapping::FieldYaml;
-use crate::missing::{is_missing, MISSING_STR};
-use crate::output::{cel_to_json, omit_null_keys};
+use crate::missing::MISSING_STR;
+use crate::output::omit_null_keys;
 use crate::paths::{
     augment_json_with_paths, augment_loop_element, build_binding_envelope,
-    collect_dotted_paths_with_roots, collect_missing_aware_injection_paths, filter_paths_by_roots,
+    collect_dotted_paths_with_roots, collect_missing_aware_injection_paths_from_compiled,
+    filter_paths_by_roots,
 };
-use cel::{Context, ExecutionError, Value};
 use serde_json::{Map, Value as JsonValue};
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::sync::Arc;
 
 pub use crosswalk_cel::StandaloneExpressionInput;
@@ -32,24 +32,20 @@ pub fn evaluate_mapping(
 
     let paths = collect_mapping_paths(mapping);
     let (src_json, root_json, ctx_json) = build_binding_envelope(source, ctx, &paths, MISSING_STR);
-    let source_val = json_to_cel(&src_json);
-    let root_val = json_to_cel(&root_json);
-    let ctx_val = json_to_cel(&ctx_json);
 
     for v in &mapping.validations {
-        match run_program(
+        match eval_compiled_json(
             &v.cel,
-            &source_val,
-            &root_val,
-            &ctx_val,
-            &empty_vars(),
+            &src_json,
+            &root_json,
+            &ctx_json,
+            JsonValue::Object(Map::new()),
             None,
             None,
             None,
-            &[],
             &codes,
         ) {
-            Ok(val) if truthy(&val) => {}
+            Ok(val) if truthy_json(&val) => {}
             Ok(_) => {
                 let err = MappingError::error(
                     ErrorCode::ValidationError,
@@ -87,9 +83,9 @@ pub fn evaluate_mapping(
     for rec in &mapping.records {
         match eval_record(
             rec,
-            &source_val,
-            &root_val,
-            &ctx_val,
+            &src_json,
+            &root_json,
+            &ctx_json,
             &codes,
             mode,
             &mut errors,
@@ -118,28 +114,28 @@ pub fn evaluate_mapping(
 fn collect_mapping_paths(mapping: &CompiledMapping) -> Vec<(String, Vec<String>)> {
     // Build a flat list of all compiled programs in this mapping so we can
     // perform AST-based classification (missing-aware vs strict context).
-    let mut programs: Vec<&cel::Program> = Vec::new();
+    let mut programs: Vec<&CompiledCel> = Vec::new();
     for v in &mapping.validations {
-        programs.push(&v.cel.program);
+        programs.push(&v.cel);
     }
     for rec in &mapping.records {
         if let Some(em) = &rec.emit {
-            programs.push(&em.program);
+            programs.push(em);
         }
         if let Some(fx) = &rec.foreach {
-            programs.push(&fx.program);
+            programs.push(fx);
         }
         if let Some(w) = &rec.when {
-            programs.push(&w.program);
+            programs.push(w);
         }
         for (_, cel) in &rec.vars {
-            programs.push(&cel.program);
+            programs.push(cel);
         }
         for field in &rec.fields {
-            programs.push(&field.cel.program);
+            programs.push(&field.cel);
         }
     }
-    let mut paths = collect_missing_aware_injection_paths(&programs);
+    let mut paths = collect_missing_aware_injection_paths_from_compiled(&programs);
 
     // For custom `foreach.as` bindings (non-standard root names like a user-defined
     // alias), AST classification cannot infer the root from the standard set.
@@ -185,31 +181,11 @@ fn field_error_policy(mode: ErrorMode, required: bool, explicit: Option<&str>) -
     }
 }
 
-fn empty_vars() -> Value {
-    Value::Map(cel::objects::Map {
-        map: Arc::new(std::collections::HashMap::new()),
-    })
-}
-
-fn json_object_to_cel_map(j: &JsonValue) -> std::collections::HashMap<cel::objects::Key, Value> {
-    let JsonValue::Object(m) = j else {
-        return std::collections::HashMap::new();
-    };
-    m.iter()
-        .map(|(k, v)| {
-            (
-                cel::objects::Key::String(Arc::new(k.clone())),
-                json_to_cel(v),
-            )
-        })
-        .collect()
-}
-
 fn eval_record(
     rec: &CompiledRecord,
-    source: &Value,
-    root: &Value,
-    ctx: &Value,
+    source: &JsonValue,
+    root: &JsonValue,
+    ctx: &JsonValue,
     codes: &Arc<crate::code_system::CodeSystemRegistry>,
     mode: ErrorMode,
     collected: &mut Vec<MappingError>,
@@ -219,16 +195,15 @@ fn eval_record(
     let mut out = Vec::new();
 
     if let Some(fx) = &rec.foreach {
-        let list_v = match run_program(
+        let list_v = match eval_compiled_json(
             fx,
             source,
             root,
             ctx,
-            &empty_vars(),
+            JsonValue::Object(Map::new()),
             None,
             None,
             None,
-            &[],
             codes,
         ) {
             Ok(v) => v,
@@ -248,7 +223,7 @@ fn eval_record(
             }
         };
         let items = match list_v {
-            Value::List(l) => l.as_ref().clone(),
+            JsonValue::Array(items) => items,
             _ => {
                 return Err(MappingError::error(
                     ErrorCode::TypeError,
@@ -264,25 +239,19 @@ fn eval_record(
             row_roots.push(as_name.as_str());
         }
         let row_paths = filter_paths_by_roots(all_paths, &row_roots);
-        for (index, item) in items.into_iter().enumerate() {
-            let item_json = match cel_to_json(&item) {
-                Ok(j) => j,
-                Err(_) => JsonValue::Object(Map::new()),
-            };
+        for (index, item_json) in items.into_iter().enumerate() {
             let aug_json =
                 augment_loop_element(&item_json, &row_paths, as_name.as_str(), MISSING_STR);
-            let aug_item = json_to_cel(&aug_json);
             if let Some(w) = &rec.when {
-                let wv = match run_program(
+                let wv = match eval_compiled_json(
                     w,
                     source,
                     root,
                     ctx,
-                    &empty_vars(),
-                    Some(&aug_item),
+                    JsonValue::Object(Map::new()),
+                    Some(&aug_json),
                     Some(index as i64),
                     Some(as_name.as_str()),
-                    &[],
                     codes,
                 ) {
                     Ok(v) => v,
@@ -302,7 +271,7 @@ fn eval_record(
                         }
                     }
                 };
-                if !truthy(&wv) {
+                if !truthy_json(&wv) {
                     continue;
                 }
             }
@@ -311,7 +280,7 @@ fn eval_record(
                 source,
                 root,
                 ctx,
-                &aug_item,
+                &aug_json,
                 index as i64,
                 as_name.as_str(),
                 codes,
@@ -328,16 +297,15 @@ fn eval_record(
     }
 
     if let Some(em) = &rec.emit {
-        let ev = match run_program(
+        let ev = match eval_compiled_json(
             em,
             source,
             root,
             ctx,
-            &empty_vars(),
+            JsonValue::Object(Map::new()),
             None,
             None,
             None,
-            &[],
             codes,
         ) {
             Ok(v) => v,
@@ -356,16 +324,15 @@ fn eval_record(
                 };
             }
         };
-        if !truthy(&ev) {
+        if !truthy_json(&ev) {
             return Ok(vec![]);
         }
     }
 
     let row_paths = filter_paths_by_roots(all_paths, &["item", "member"]);
     let aug_json = augment_loop_element(&JsonValue::Null, &row_paths, "item", MISSING_STR);
-    let aug_item = json_to_cel(&aug_json);
     if let Some(row) = eval_record_row(
-        rec, source, root, ctx, &aug_item, -1, "item", codes, mode, collected, warnings, None,
+        rec, source, root, ctx, &aug_json, -1, "item", codes, mode, collected, warnings, None,
         all_paths,
     )? {
         out.push(row);
@@ -375,10 +342,10 @@ fn eval_record(
 
 fn eval_record_row(
     rec: &CompiledRecord,
-    source: &Value,
-    root: &Value,
-    ctx: &Value,
-    item: &Value,
+    source: &JsonValue,
+    root: &JsonValue,
+    ctx: &JsonValue,
+    item: &JsonValue,
     index: i64,
     as_name: &str,
     codes: &Arc<crate::code_system::CodeSystemRegistry>,
@@ -389,35 +356,28 @@ fn eval_record_row(
     all_paths: &[(String, Vec<String>)],
 ) -> Result<Option<JsonValue>, MappingError> {
     let vars_paths = filter_paths_by_roots(all_paths, &["vars"]);
-    let mut cel_vars_inner: std::collections::HashMap<cel::objects::Key, Value> =
-        if vars_paths.is_empty() {
-            std::collections::HashMap::new()
-        } else {
-            let mut wrap = Map::new();
-            wrap.insert("vars".into(), JsonValue::Object(Map::new()));
-            let mut env = JsonValue::Object(wrap);
-            augment_json_with_paths(&mut env, &vars_paths, MISSING_STR);
-            let vars_json = env
-                .get("vars")
-                .cloned()
-                .unwrap_or_else(|| JsonValue::Object(Map::new()));
-            json_object_to_cel_map(&vars_json)
-        };
+    let mut vars_json = if vars_paths.is_empty() {
+        Map::new()
+    } else {
+        let mut wrap = Map::new();
+        wrap.insert("vars".into(), JsonValue::Object(Map::new()));
+        let mut env = JsonValue::Object(wrap);
+        augment_json_with_paths(&mut env, &vars_paths, MISSING_STR);
+        env.get("vars")
+            .and_then(|value| value.as_object().cloned())
+            .unwrap_or_default()
+    };
 
     for (vn, prog) in &rec.vars {
-        let vars_val = Value::Map(cel::objects::Map {
-            map: Arc::new(cel_vars_inner.clone()),
-        });
-        let v = match run_program(
+        let v = match eval_compiled_json(
             prog,
             source,
             root,
             ctx,
-            &vars_val,
+            JsonValue::Object(vars_json.clone()),
             Some(item),
             Some(index),
             Some(as_name),
-            &[],
             codes,
         ) {
             Ok(v) => v,
@@ -434,29 +394,24 @@ fn eval_record_row(
                         collected.push(err);
                     }
                 }
-                Value::Null
+                JsonValue::Null
             }
         };
-        cel_vars_inner.insert(cel::objects::Key::String(Arc::new(vn.clone())), v.clone());
+        vars_json.insert(vn.clone(), v.clone());
     }
-
-    let vars_val = Value::Map(cel::objects::Map {
-        map: Arc::new(cel_vars_inner),
-    });
 
     let mut obj = Map::new();
     for cf in &rec.fields {
         let path = format!("records.{}.fields.{}", rec.name, cf.name);
-        let res = run_program(
+        let res = eval_compiled_json(
             &cf.cel,
             source,
             root,
             ctx,
-            &vars_val,
+            JsonValue::Object(vars_json.clone()),
             Some(item),
             Some(index),
             Some(as_name),
-            &[],
             codes,
         );
         let (required, on_err, defv) = match &cf.yaml {
@@ -474,36 +429,7 @@ fn eval_record_row(
         };
 
         match res {
-            Ok(v) => {
-                let j = match cel_to_json(&v) {
-                    Ok(j) => j,
-                    Err(e) => {
-                        if matches!(mode, ErrorMode::Strict) {
-                            return Err(mapping_err_with_expr(
-                                ErrorCode::InternalError,
-                                e,
-                                Some(path.clone()),
-                                &cf.cel.source,
-                            ));
-                        }
-                        let row = mapping_err_with_expr(
-                            ErrorCode::InternalError,
-                            e.clone(),
-                            Some(path.clone()),
-                            &cf.cel.source,
-                        )
-                        .with_record(rec.name.clone(), row_index);
-                        match mode {
-                            ErrorMode::Lenient if !required => {
-                                warnings.push(row.warning());
-                            }
-                            _ => {
-                                collected.push(row);
-                            }
-                        }
-                        JsonValue::Null
-                    }
-                };
+            Ok(j) => {
                 if j.is_null() && required {
                     if matches!(mode, ErrorMode::Strict) {
                         return Err(mapping_err_with_expr(
@@ -640,7 +566,7 @@ fn apply_field_error_output(
     path: &str,
     on_err: &str,
     defv: Option<serde_yaml::Value>,
-    err: ExecutionError,
+    err: impl Display,
     expr_source: &str,
 ) -> Result<(), MappingError> {
     match on_err {
@@ -667,61 +593,58 @@ fn apply_field_error_output(
     }
 }
 
-fn truthy(v: &Value) -> bool {
-    if is_missing(v) {
+fn truthy_json(v: &JsonValue) -> bool {
+    if matches!(v, JsonValue::String(s) if s == MISSING_STR) {
         return false;
     }
     match v {
-        Value::Bool(b) => *b,
-        Value::Null | Value::UInt(0) | Value::Int(0) => false,
-        Value::String(s) => !s.is_empty(),
-        Value::List(l) => !l.is_empty(),
-        Value::Map(m) => !m.map.is_empty(),
-        _ => true,
+        JsonValue::Bool(b) => *b,
+        JsonValue::Null => false,
+        JsonValue::Number(n) => n.as_i64() != Some(0) && n.as_u64() != Some(0),
+        JsonValue::String(s) => !s.is_empty(),
+        JsonValue::Array(items) => !items.is_empty(),
+        JsonValue::Object(map) => !map.is_empty(),
     }
 }
 
-pub(crate) fn json_to_cel(j: &JsonValue) -> Value {
-    cel::to_value(j).unwrap_or(Value::Null)
-}
-
-pub(crate) fn run_program(
+fn eval_compiled_json(
     cel: &CompiledCel,
-    source: &Value,
-    root: &Value,
-    ctx: &Value,
-    vars: &Value,
-    item: Option<&Value>,
+    source: &JsonValue,
+    root: &JsonValue,
+    ctx: &JsonValue,
+    vars: JsonValue,
+    item: Option<&JsonValue>,
     index: Option<i64>,
     as_name: Option<&str>,
-    extra_bindings: &[(&str, Value)],
     codes: &Arc<crate::code_system::CodeSystemRegistry>,
-) -> Result<Value, ExecutionError> {
-    let mut c = Context::default();
-    register_stdlib(&mut c, Arc::clone(codes));
-    c.add_variable_from_value("source", source.clone());
-    c.add_variable_from_value("root", root.clone());
-    c.add_variable_from_value("ctx", ctx.clone());
-    c.add_variable_from_value("vars", vars.clone());
-    if let Some(ix) = index {
-        c.add_variable_from_value("index", ix);
+) -> Result<JsonValue, String> {
+    let mut root_bindings = BTreeMap::from([
+        ("source".to_string(), source.clone()),
+        ("root".to_string(), root.clone()),
+        ("ctx".to_string(), ctx.clone()),
+        ("vars".to_string(), vars),
+    ]);
+    if let Some(index) = index {
+        root_bindings.insert("index".to_string(), JsonValue::from(index));
     }
-    if let (Some(it), Some(an)) = (item, as_name) {
-        c.add_variable_from_value(an, it.clone());
-        if an != "item" {
-            c.add_variable_from_value("item", it.clone());
+    if let (Some(item), Some(as_name)) = (item, as_name) {
+        root_bindings.insert(as_name.to_string(), item.clone());
+        if as_name != "item" {
+            root_bindings.insert("item".to_string(), item.clone());
         }
     } else {
-        c.add_variable_from_value("item", Value::Null);
+        root_bindings.insert("item".to_string(), JsonValue::Null);
     }
-    for (name, value) in extra_bindings {
-        c.add_variable_from_value(*name, value.clone());
-    }
-    cel.program.execute(&c)
+    crosswalk_cel::evaluate_compiled_expression_with_input(
+        cel,
+        StandaloneExpressionInput::new(root_bindings),
+        Arc::clone(codes),
+    )
+    .map_err(|err| err.to_string())
 }
 
 /// `path_suffix` is the last segment after `records.{record}.` (e.g. `fields.foo`, `when`, `vars.x`).
-fn exec_validation_err(path: &str, expr: &str, message: &str, e: ExecutionError) -> MappingError {
+fn exec_validation_err(path: &str, expr: &str, message: &str, e: impl Display) -> MappingError {
     mapping_err_with_expr(
         ErrorCode::EvaluationError,
         format!("{message}: {}", e),
@@ -744,7 +667,7 @@ fn mapping_err_with_expr(
 fn exec_mapping_err_path(
     record: &str,
     field: &str,
-    e: ExecutionError,
+    e: impl Display,
     path_suffix: &str,
     expr_source: &str,
 ) -> MappingError {

@@ -18,14 +18,13 @@ pub mod runtime;
 pub mod security;
 
 mod budget;
-mod functions;
 
 pub use code_system::{CodeEntry, CodeSystemRegistry};
 pub use compiled::{CompiledCel, CompiledMapping, ErrorMode};
 pub use compiler::compile_mapping_yaml;
 pub use crosswalk_cel::{
-    ast_paths, evaluate_cel_expression, evaluate_cel_expression_with_input, expr, missing, output,
-    paths, preview_cel_expression, preview_cel_expression_with_input, validate_root_binding_name,
+    evaluate_cel_expression, evaluate_cel_expression_with_input, expr, missing, output, paths,
+    preview_cel_expression, preview_cel_expression_with_input, validate_root_binding_name,
     StandaloneExpressionInput,
 };
 pub use crosswalk_functions_cel::{helper_metadata, HelperArity, HelperMetadata};

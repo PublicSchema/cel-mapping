@@ -31,7 +31,7 @@ fn json_safe_u64(u: u64) -> Result<JsonValue, String> {
     Ok(JsonValue::Number(Number::from(u as i64)))
 }
 
-pub fn cel_to_json(v: &Value) -> Result<JsonValue, String> {
+pub(crate) fn cel_to_json(v: &Value) -> Result<JsonValue, String> {
     match v {
         Value::Null => Ok(JsonValue::Null),
         Value::Bool(b) => Ok(JsonValue::Bool(*b)),

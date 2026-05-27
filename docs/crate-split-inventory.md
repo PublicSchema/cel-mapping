@@ -43,7 +43,7 @@ New direct crate paths:
 - `crosswalk_cel::{compile_expr,evaluate_cel_expression,evaluate_compiled_expression_with_input,preview_cel_expression,SecurityLimits}`
 - `crosswalk_publicschema::{compile_publicschema_mapping,evaluate_publicschema_mapping}`
 
-`crosswalk-cel` keeps the upstream `cel::Value` model private. Public consumers pass JSON root bindings through `StandaloneExpressionInput`; extracted crates that already hold a `CompiledCel` use `evaluate_compiled_expression_with_input` rather than passing CEL values across crate boundaries.
+`crosswalk-cel` keeps the upstream `cel::Value` and `cel::Program` models private. Public consumers pass JSON root bindings through `StandaloneExpressionInput`; extracted crates that already hold a `CompiledCel` use `evaluate_compiled_expression_with_input` rather than passing CEL engine values across crate boundaries.
 
 ## Serde And Trait Notes
 

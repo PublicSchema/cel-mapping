@@ -62,3 +62,41 @@ fn crate_root_does_not_re_export_dependency_crates_wholesale() {
         );
     }
 }
+
+#[test]
+fn compiled_expression_does_not_expose_engine_program_field() {
+    let compiled = include_str!("../src/compiled.rs");
+
+    assert!(
+        !compiled.contains("pub program"),
+        "CompiledCel must not expose the upstream cel::Program field"
+    );
+}
+
+#[test]
+fn public_modules_do_not_expose_upstream_cel_value_or_program_helpers() {
+    for (path, forbidden) in [
+        (
+            "../src/paths.rs",
+            "pub fn collect_missing_aware_injection_paths(",
+        ),
+        ("../src/ast_paths.rs", "pub fn classify_all_paths"),
+        ("../src/output.rs", "pub fn cel_to_json"),
+        ("../src/missing.rs", "pub fn missing_value"),
+        ("../src/missing.rs", "pub fn is_missing"),
+    ] {
+        let source = include_str!("../src/lib.rs");
+        let module_source = match path {
+            "../src/paths.rs" => include_str!("../src/paths.rs"),
+            "../src/ast_paths.rs" => include_str!("../src/ast_paths.rs"),
+            "../src/output.rs" => include_str!("../src/output.rs"),
+            "../src/missing.rs" => include_str!("../src/missing.rs"),
+            _ => source,
+        };
+
+        assert!(
+            !module_source.contains(forbidden),
+            "{path} must not expose `{forbidden}`"
+        );
+    }
+}

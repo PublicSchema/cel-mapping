@@ -2,6 +2,7 @@
 //! Path discovery ignores string literals (same rules as [`crate::expr::rewrite_namespaced_calls`]).
 
 use crate::cel_scan::for_each_code_segment;
+use crate::compiled::CompiledCel;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::{Map, Number, Value as JsonValue};
@@ -24,7 +25,15 @@ static ATTR_PATH: Lazy<Regex> = Lazy::new(|| {
 /// This replaces the regex-based `collect_dotted_paths` for the sentinel
 /// injection step at evaluation time.  The regex form is still used during
 /// compilation (expression inventory) where compiled programs are unavailable.
-pub fn collect_missing_aware_injection_paths(
+pub fn collect_missing_aware_injection_paths_from_compiled(
+    programs: &[&CompiledCel],
+) -> Vec<(String, Vec<String>)> {
+    let raw_programs: Vec<&cel::Program> =
+        programs.iter().map(|compiled| &compiled.program).collect();
+    collect_missing_aware_injection_paths(&raw_programs)
+}
+
+pub(crate) fn collect_missing_aware_injection_paths(
     programs: &[&cel::Program],
 ) -> Vec<(String, Vec<String>)> {
     let mut all_missing_aware: std::collections::HashSet<String> = std::collections::HashSet::new();

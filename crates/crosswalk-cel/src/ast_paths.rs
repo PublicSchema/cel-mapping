@@ -33,7 +33,8 @@ const MISSING_AWARE_HELPERS: &[&str] = &[
 /// appear in any other context are excluded from the returned set.
 ///
 /// The caller should inject a Missing sentinel only for the returned paths.
-pub fn missing_aware_only_paths(expr: &IdedExpr) -> HashSet<String> {
+#[cfg(test)]
+fn missing_aware_only_paths(expr: &IdedExpr) -> HashSet<String> {
     let (missing_aware, strict) = classify_all_paths(expr);
     missing_aware.difference(&strict).cloned().collect()
 }
@@ -45,22 +46,11 @@ pub fn missing_aware_only_paths(expr: &IdedExpr) -> HashSet<String> {
 /// A path can appear in both sets (e.g., `present(source.a) && source.a == "x"`).
 /// The caller decides the injection policy (typically: inject only if in `missing_aware`
 /// but not in `strict`).
-pub fn classify_all_paths(expr: &IdedExpr) -> (HashSet<String>, HashSet<String>) {
+pub(crate) fn classify_all_paths(expr: &IdedExpr) -> (HashSet<String>, HashSet<String>) {
     let mut missing_aware: HashSet<String> = HashSet::new();
     let mut strict: HashSet<String> = HashSet::new();
     classify_expr(expr, false, &mut missing_aware, &mut strict);
     (missing_aware, strict)
-}
-
-/// Public re-export of `classify_expr` so `paths.rs` can drive per-node
-/// classification when building multi-program injection sets.
-pub fn classify_expr_pub(
-    expr: &IdedExpr,
-    in_missing_aware_arg: bool,
-    missing_aware: &mut HashSet<String>,
-    strict: &mut HashSet<String>,
-) {
-    classify_expr(expr, in_missing_aware_arg, missing_aware, strict);
 }
 
 /// Walk `expr`.

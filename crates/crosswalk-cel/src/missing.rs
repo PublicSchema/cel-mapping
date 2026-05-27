@@ -10,16 +10,5 @@
 //! runs). Treat full engine-level “unknown member → Missing” as out of scope until the CEL
 //! integration exposes a safe extension point.
 
-use cel::Value;
-use std::sync::Arc;
-
 /// Marker never produced by normal JSON ingestion.
 pub const MISSING_STR: &str = "\u{E0000}__CEL_MAPPER_MISSING__\u{E0000}";
-
-pub fn missing_value() -> Value {
-    Value::String(Arc::new(MISSING_STR.to_string()))
-}
-
-pub fn is_missing(v: &Value) -> bool {
-    matches!(v, Value::String(s) if s.as_str() == MISSING_STR)
-}

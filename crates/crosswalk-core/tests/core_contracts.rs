@@ -1,9 +1,8 @@
 //! Regression tests for spec-critical behaviour (review feedback P1/P2).
 
-use cel::Value;
 use crosswalk_core::compiled::ErrorMode;
 use crosswalk_core::expr::rewrite_namespaced_calls;
-use crosswalk_core::output::{cel_to_json, JSON_SAFE_INT_MAX};
+use crosswalk_core::output::JSON_SAFE_INT_MAX;
 use crosswalk_core::paths::{build_binding_envelope, collect_dotted_paths};
 use crosswalk_core::runtime::{EvaluationInput, MappingRuntime, RuntimeOptions};
 use crosswalk_core::security::SecurityLimits;
@@ -113,11 +112,17 @@ records:
 }
 
 #[test]
-fn cel_to_json_rejects_js_unsafe_integers() {
-    let v = Value::Int(JSON_SAFE_INT_MAX + 1);
-    assert!(cel_to_json(&v).is_err());
-    let u = Value::UInt((JSON_SAFE_INT_MAX as u64) + 1);
-    assert!(cel_to_json(&u).is_err());
+fn public_evaluation_rejects_js_unsafe_integer_output() {
+    let rt = MappingRuntime::new(RuntimeOptions::default());
+    let result = rt.evaluate_cel_expression(
+        &(JSON_SAFE_INT_MAX + 1).to_string(),
+        EvaluationInput {
+            source: json!({}),
+            context: json!({}),
+        },
+    );
+
+    assert!(matches!(result, Err(StandaloneEvalError::Evaluate { .. })));
 }
 
 #[test]
