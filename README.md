@@ -67,10 +67,13 @@ Summary:
 Requires [`wasm-pack`](https://rustwasm.github.io/wasm-pack/) and the **`wasm32-unknown-unknown`** target. From **`packages/js`** (so `--out-dir` resolves next to this package):
 
 ```bash
-cd packages/js && npm ci && npm run build:wasm && npm run build:ts
+cd packages/js && npm ci && npm test
 ```
 
-The **`build:wasm`** script runs `wasm-pack` with the correct `--out-dir` for this repo layout.
+The **`test`** script builds WASM, builds TypeScript, and runs Node smoke tests
+against the generated package. The **`build:wasm`** script runs `wasm-pack`
+with the correct `--out-dir` for this repo layout and prefers rustup-managed
+Rust when it is installed.
 
 For **idiomatic TypeScript** (`CelMapper`, camelCase, object I/O) and **copy-paste examples**, see **[`packages/js/README.md`](./packages/js/README.md)**. The WASM class exposes JSON-oriented methods such as **`evaluate_json`**, **`compile_mapping_meta`**, **`set_limits_json`**, **`set_runtime_options_json`**, **`evaluate_expression_json`** (single CEL expression, `{"ok":true,"value":…}` / `{"ok":false,"error":…}`), and **`preview_expression_json`** (editor-oriented `ExpressionPreviewResult` JSON). See `crates/cel-mapper-wasm/src/lib.rs` and `packages/js/src/index.ts` for helpers.
 

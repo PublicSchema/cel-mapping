@@ -13,9 +13,12 @@ From **`packages/js`** (so `wasm-pack` `--out-dir` is correct):
 
 ```bash
 npm ci
-npm run build:wasm
-npm run build:ts
+npm test
 ```
+
+`npm test` builds the WASM package, builds TypeScript, and runs Node smoke tests
+against the generated wrapper. The WASM build script prefers rustup-managed Rust
+when it is installed so the `wasm32-unknown-unknown` target is visible.
 
 ## Example 1 — evaluate a mapping (high-level)
 

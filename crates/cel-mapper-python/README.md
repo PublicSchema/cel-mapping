@@ -8,11 +8,14 @@ Parent overview: **[`../../README.md`](../../README.md)**.
 
 ```bash
 cd crates/cel-mapper-python
-python3 -m venv .venv && source .venv/bin/activate
+python3.13 -m venv .venv && source .venv/bin/activate
 pip install maturin pytest
 maturin develop --release
 pytest -q
 ```
+
+Supported Python versions are 3.10 through 3.13. The current PyO3 dependency
+line does not support Python 3.14.
 
 ## Examples
 

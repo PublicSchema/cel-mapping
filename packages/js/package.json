@@ -17,9 +17,10 @@
     "wasm-pkg"
   ],
   "scripts": {
-    "build:wasm": "wasm-pack build ../../crates/cel-mapper-wasm --target web --out-dir ../../packages/js/wasm-pkg",
+    "build:wasm": "PATH=$HOME/.cargo/bin:$PATH wasm-pack build ../../crates/cel-mapper-wasm --target web --out-dir ../../packages/js/wasm-pkg",
     "build:ts": "tsc -p tsconfig.json",
-    "build": "npm run build:wasm && npm run build:ts"
+    "build": "npm run build:wasm && npm run build:ts",
+    "test": "npm run build && node --test tests/*.test.mjs"
   },
   "devDependencies": {
     "typescript": "~5.6.3"
