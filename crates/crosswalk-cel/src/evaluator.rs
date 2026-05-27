@@ -90,7 +90,7 @@ pub fn evaluate_compiled_expression_with_input(
     let paths = collect_missing_aware_injection_paths(&[&cel.program]);
     let root_bindings = prepare_root_bindings(input.root_bindings, &paths);
     let value =
-        run_program_with_root_bindings(&cel, &root_bindings, &[], &codes).map_err(|err| {
+        run_program_with_root_bindings(cel, &root_bindings, &[], &codes).map_err(|err| {
             StandaloneEvalError::Evaluate {
                 message: err.to_string(),
                 expression: cel.source.clone(),
