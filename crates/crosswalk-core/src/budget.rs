@@ -1,7 +1,6 @@
 //! Compatibility facade for adapter budget limits.
 
 use crate::security::SecurityLimits;
-use cel::ExecutionError;
 use std::sync::Arc;
 
 pub struct BudgetGuard {
@@ -19,15 +18,4 @@ impl BudgetGuard {
             )),
         }
     }
-}
-
-#[allow(dead_code)]
-pub fn enforce_max_list_len(n: usize) -> Result<(), ExecutionError> {
-    let _ = n;
-    Ok(())
-}
-
-#[allow(dead_code)]
-pub fn enforce_max_string_bytes(_len: usize) -> Result<(), ExecutionError> {
-    Ok(())
 }

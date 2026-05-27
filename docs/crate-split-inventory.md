@@ -6,6 +6,8 @@ Status: implementation inventory for `spec-crate-split-v0.3.md`.
 
 Current CEL helper registration moved to `crosswalk-functions-cel`; pure deterministic helper semantics live in `crosswalk-functions` where the v0.3 API exists. The adapter preserves current CEL names, arity checks, null/missing coercion, warnings, and compatibility behavior.
 
+Dependency graph matches spec §6.5: `crosswalk-publicschema` depends directly on `crosswalk-cel` for expression compile/evaluate behavior and on `crosswalk-functions` for code-system and pure helper semantics. It does not depend on `crosswalk-functions-cel`; CEL helper registration remains behind the `crosswalk-cel` boundary.
+
 Important preserved behavior:
 
 - `text_regex_extract` returns an empty string through CEL when the pattern does not match or a capture group is missing.
@@ -20,7 +22,7 @@ Important preserved behavior:
 - `crosswalk-functions`: text, email, phone, date, IDs, redaction, JSON parse/stringify, code-system registry, code entries, typed code-system documents, and ISO preload.
 - `crosswalk-functions-cel`: CEL `Value` conversion, helper registration, arity validation, missing/null compatibility, request fallback resolution, warning collection, and helper metadata.
 - `crosswalk-cel`: standalone expression compile/evaluate/preview, security limits, expression diagnostics, missing-path injection, CEL/JSON conversion, and reusable compiled-expression wrappers.
-- `crosswalk-publicschema`: PublicSchema v0.2 document parsing, compile/evaluate, value mappings, JSON Pointer reads/writes, deterministic hash, logs, warnings, and privacy-aware log values.
+- `crosswalk-publicschema`: PublicSchema v0.2 document parsing, compile/evaluate, value mappings, JSON Pointer reads/writes, deterministic hash, logs, warnings, privacy-aware log values, and direct use of `crosswalk-cel` plus `crosswalk-functions`.
 - `crosswalk-core`: v0.1 mapping runtime and compatibility facade. It still preserves existing public core paths for current bindings and callers.
 
 ## Public Types And Re-Export Paths
@@ -38,8 +40,10 @@ New direct crate paths:
 
 - `crosswalk_functions::{text,email,phone,date,ids,redaction,json,codes}`
 - `crosswalk_functions_cel::{register_stdlib,register_crosswalk_functions,helper_metadata}`
-- `crosswalk_cel::{compile_expr,evaluate_cel_expression,preview_cel_expression,SecurityLimits}`
+- `crosswalk_cel::{compile_expr,evaluate_cel_expression,preview_cel_expression,SecurityLimits,CelValue}`
 - `crosswalk_publicschema::{compile_publicschema_mapping,evaluate_publicschema_mapping}`
+
+`crosswalk_cel::CelValue` is an explicitly public transitional API. It is exposed so extracted crates and current integration tests can pass CEL values across the split boundary without depending on the underlying `cel` crate directly. Treat it as boundary glue rather than a long-term PublicSchema authoring surface.
 
 ## Serde And Trait Notes
 
@@ -55,5 +59,6 @@ No diagnostic wording changes are intentionally accepted in this implementation.
 ## Pitfalls Logged
 
 - The existing PublicSchema evaluator did not set thread-local helper context. This was surprising because generic and standalone evaluation do install context. The split preserves that behavior to avoid unreviewed drift.
+- Direct `evaluate_publicschema_mapping` also does not install `FunctionSecurityLimits` / `BudgetGuard`. Compile-time `SecurityLimits` still validate expression size, but helper hot-path limits such as `max_string_bytes` are not applied during direct PublicSchema evaluation unless the caller installs a guard at a higher layer.
 - `serde_yaml` remains above `crosswalk-functions`; the leaf crate accepts typed `CodeSystemDocument` values and uses a simple embedded ISO loader without `serde_yaml`.
 - `cel::ExecutionError` remains inside adapter/evaluator internals. Public standalone APIs expose stable evaluator errors instead.

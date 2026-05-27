@@ -5,38 +5,33 @@
 //! [`evaluator::preview_cel_expression`] / [`errors::ExpressionPreviewResult`].
 //! See the workspace [`README.md`](../../../README.md) for layout and binding commands.
 
-pub mod ast_paths;
 pub mod code_system;
 pub mod compiled;
 pub mod compiler;
 pub mod errors;
 pub mod eval_ctx;
 pub mod evaluator;
-pub mod expr;
 mod iso_systems;
 pub mod mapping;
-pub mod missing;
-pub mod output;
-pub mod paths;
 pub mod publicschema;
 pub mod runtime;
 pub mod security;
 
 mod budget;
-mod cel_scan;
 mod functions;
 
 pub use code_system::{CodeEntry, CodeSystemRegistry};
 pub use compiled::{CompiledCel, CompiledMapping, ErrorMode};
 pub use compiler::compile_mapping_yaml;
+pub use crosswalk_cel::{
+    ast_paths, evaluate_cel_expression, evaluate_cel_expression_with_input, expr, missing, output,
+    paths, preview_cel_expression, preview_cel_expression_with_input, validate_root_binding_name,
+    StandaloneExpressionInput,
+};
 pub use crosswalk_functions_cel::{helper_metadata, HelperArity, HelperMetadata};
 pub use errors::{
     CompileError, ErrorCode, ErrorSeverity, ExpressionIssue, ExpressionPhase,
     ExpressionPreviewResult, MappingError, StandaloneEvalError,
-};
-pub use evaluator::{
-    evaluate_cel_expression, evaluate_cel_expression_with_input, preview_cel_expression,
-    preview_cel_expression_with_input, validate_root_binding_name, StandaloneExpressionInput,
 };
 pub use mapping::MappingDocument;
 pub use paths::primary_binding_hint;

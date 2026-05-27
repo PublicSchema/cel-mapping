@@ -14,7 +14,8 @@ pub fn compile_mapping_yaml(
     mut registry: CodeSystemRegistry,
     runtime_default_errors_mode: Option<&str>,
 ) -> Result<CompiledMapping, CompileError> {
-    let doc: MappingDocument = serde_yaml::from_str(yaml)?;
+    let doc: MappingDocument = serde_yaml::from_str(yaml)
+        .map_err(|err| CompileError::Mapping(format!("YAML parse error: {err}")))?;
     crate::code_system::merge_from_map(&mut registry, &doc.code_systems)
         .map_err(|e| CompileError::Mapping(e.to_string()))?;
     let reg = Arc::new(registry);

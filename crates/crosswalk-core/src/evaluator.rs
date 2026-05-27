@@ -3,10 +3,7 @@
 
 use crate::compiled::CompiledCel;
 use crate::compiled::{CompiledMapping, CompiledRecord, ErrorMode};
-use crate::errors::{
-    ErrorCode, ExpressionIssue, ExpressionPhase, ExpressionPreviewResult, MappingError,
-    StandaloneEvalError,
-};
+use crate::errors::{ErrorCode, ExpressionPreviewResult, MappingError, StandaloneEvalError};
 use crate::functions::register_stdlib;
 use crate::mapping::FieldYaml;
 use crate::missing::{is_missing, MISSING_STR};
@@ -15,7 +12,7 @@ use crate::paths::{
     augment_json_with_paths, augment_loop_element, build_binding_envelope,
     collect_dotted_paths_with_roots, collect_missing_aware_injection_paths, filter_paths_by_roots,
 };
-use cel::{Context, ExecutionError, Program, Value};
+use cel::{Context, ExecutionError, Value};
 use serde_json::{Map, Value as JsonValue};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -723,23 +720,6 @@ pub(crate) fn run_program(
     cel.program.execute(&c)
 }
 
-fn run_program_with_root_bindings(
-    cel: &CompiledCel,
-    root_bindings: &BTreeMap<String, Value>,
-    extra_bindings: &[(&str, Value)],
-    codes: &Arc<crate::code_system::CodeSystemRegistry>,
-) -> Result<Value, ExecutionError> {
-    let mut c = Context::default();
-    register_stdlib(&mut c, Arc::clone(codes));
-    for (name, value) in root_bindings {
-        c.add_variable_from_value(name.as_str(), value.clone());
-    }
-    for (name, value) in extra_bindings {
-        c.add_variable_from_value(*name, value.clone());
-    }
-    cel.program.execute(&c)
-}
-
 /// `path_suffix` is the last segment after `records.{record}.` (e.g. `fields.foo`, `when`, `vars.x`).
 fn exec_validation_err(path: &str, expr: &str, message: &str, e: ExecutionError) -> MappingError {
     mapping_err_with_expr(
@@ -795,12 +775,7 @@ pub fn evaluate_cel_expression(
     limits: &crate::security::SecurityLimits,
     codes: Arc<crate::code_system::CodeSystemRegistry>,
 ) -> Result<JsonValue, StandaloneEvalError> {
-    evaluate_cel_expression_with_input(
-        expr,
-        StandaloneExpressionInput::from_source_context(source, ctx),
-        limits,
-        codes,
-    )
+    crosswalk_cel::evaluate_cel_expression(expr, source, ctx, limits, codes)
 }
 
 /// Evaluate one mapping-stdlib CEL expression against arbitrary root bindings.
@@ -813,50 +788,7 @@ pub fn evaluate_cel_expression_with_input(
     limits: &crate::security::SecurityLimits,
     codes: Arc<crate::code_system::CodeSystemRegistry>,
 ) -> Result<JsonValue, StandaloneEvalError> {
-    validate_root_bindings(&input.root_bindings)?;
-    let cel = crate::compiler::compile_expr(expr, limits, "expression".into())?;
-    let paths = collect_missing_aware_injection_paths(&[&cel.program]);
-    let root_bindings = prepare_root_bindings(input.root_bindings, &paths);
-    let v = run_program_with_root_bindings(&cel, &root_bindings, &[], &codes).map_err(|e| {
-        StandaloneEvalError::Evaluate {
-            message: e.to_string(),
-            expression: cel.source.clone(),
-        }
-    })?;
-    cel_to_json(&v).map_err(|m| StandaloneEvalError::Evaluate {
-        message: m,
-        expression: cel.source.clone(),
-    })
-}
-
-/// CEL’s `Display` adds a source line + caret when `source_info` is present (normal `Program::compile` path).
-const MAX_DIAGNOSTIC_CHARS: usize = 12_000;
-
-fn issues_from_parse_errors(author_expression: &str, e: &cel::ParseErrors) -> Vec<ExpressionIssue> {
-    e.errors
-        .iter()
-        .map(|pe| ExpressionIssue {
-            phase: ExpressionPhase::Syntax,
-            severity: crate::errors::ErrorSeverity::Error,
-            code: ErrorCode::ParseError,
-            message: crate::errors::truncate_diagnostic_string(
-                &pe.to_string(),
-                MAX_DIAGNOSTIC_CHARS,
-            ),
-            line: isize_pos_to_u32(pe.pos.0),
-            column: isize_pos_to_u32(pe.pos.1),
-            expression: author_expression.to_string(),
-            source_path: None,
-        })
-        .collect()
-}
-
-fn isize_pos_to_u32(v: isize) -> Option<u32> {
-    if v <= 0 {
-        None
-    } else {
-        Some(v as u32)
-    }
+    crosswalk_cel::evaluate_cel_expression_with_input(expr, input, limits, codes)
 }
 
 /// Compile and evaluate one expression, returning **structured** diagnostics (syntax line/column,
@@ -868,12 +800,7 @@ pub fn preview_cel_expression(
     limits: &crate::security::SecurityLimits,
     codes: Arc<crate::code_system::CodeSystemRegistry>,
 ) -> ExpressionPreviewResult {
-    preview_cel_expression_with_input(
-        expr,
-        StandaloneExpressionInput::from_source_context(source, ctx),
-        limits,
-        codes,
-    )
+    crosswalk_cel::preview_cel_expression(expr, source, ctx, limits, codes)
 }
 
 /// Compile and evaluate one expression against arbitrary root bindings, returning structured
@@ -884,152 +811,9 @@ pub fn preview_cel_expression_with_input(
     limits: &crate::security::SecurityLimits,
     codes: Arc<crate::code_system::CodeSystemRegistry>,
 ) -> ExpressionPreviewResult {
-    let author = expr.to_string();
-
-    if let Err(issue) = validate_root_bindings_for_preview(&input.root_bindings, &author) {
-        return ExpressionPreviewResult::from_parts(author, None, vec![issue]);
-    }
-
-    if let Err(m) = limits.check_expr(expr) {
-        return ExpressionPreviewResult::from_parts(
-            author.clone(),
-            None,
-            vec![ExpressionIssue {
-                phase: ExpressionPhase::Limits,
-                severity: crate::errors::ErrorSeverity::Error,
-                code: ErrorCode::InternalError,
-                message: m,
-                line: None,
-                column: None,
-                expression: author.clone(),
-                source_path: None,
-            }],
-        );
-    }
-
-    let rewritten = crate::expr::rewrite_namespaced_calls(expr);
-    let cel = match Program::compile(&rewritten) {
-        Ok(program) => CompiledCel {
-            program,
-            source: author.clone(),
-        },
-        Err(e) => {
-            return ExpressionPreviewResult::from_parts(
-                author.clone(),
-                Some(rewritten.clone()),
-                issues_from_parse_errors(&author, &e),
-            );
-        }
-    };
-
-    let paths = collect_missing_aware_injection_paths(&[&cel.program]);
-    let root_bindings = prepare_root_bindings(input.root_bindings, &paths);
-
-    let v = match run_program_with_root_bindings(&cel, &root_bindings, &[], &codes) {
-        Ok(v) => v,
-        Err(e) => {
-            return ExpressionPreviewResult::from_parts(
-                author.clone(),
-                Some(rewritten.clone()),
-                vec![ExpressionIssue {
-                    phase: ExpressionPhase::Evaluation,
-                    severity: crate::errors::ErrorSeverity::Error,
-                    code: ErrorCode::EvaluationError,
-                    message: crate::errors::truncate_diagnostic_string(
-                        &e.to_string(),
-                        MAX_DIAGNOSTIC_CHARS,
-                    ),
-                    line: None,
-                    column: None,
-                    expression: cel.source.clone(),
-                    source_path: crate::paths::primary_binding_hint(&cel.source),
-                }],
-            );
-        }
-    };
-
-    match cel_to_json(&v) {
-        Ok(j) => ExpressionPreviewResult::success(author, rewritten, j),
-        Err(m) => ExpressionPreviewResult::from_parts(
-            author.clone(),
-            Some(rewritten.clone()),
-            vec![ExpressionIssue {
-                phase: ExpressionPhase::Evaluation,
-                severity: crate::errors::ErrorSeverity::Error,
-                code: ErrorCode::TypeError,
-                message: m,
-                line: None,
-                column: None,
-                expression: cel.source.clone(),
-                source_path: crate::paths::primary_binding_hint(&cel.source),
-            }],
-        ),
-    }
-}
-
-fn prepare_root_bindings(
-    root_bindings: BTreeMap<String, JsonValue>,
-    paths: &[(String, Vec<String>)],
-) -> BTreeMap<String, Value> {
-    let mut env = JsonValue::Object(root_bindings.into_iter().collect());
-    augment_json_with_paths(&mut env, paths, MISSING_STR);
-    match env {
-        JsonValue::Object(m) => m.into_iter().map(|(k, v)| (k, json_to_cel(&v))).collect(),
-        _ => BTreeMap::new(),
-    }
-}
-
-fn validate_root_bindings(
-    root_bindings: &BTreeMap<String, JsonValue>,
-) -> Result<(), StandaloneEvalError> {
-    for name in root_bindings.keys() {
-        if let Err(message) = validate_root_binding_name(name) {
-            return Err(StandaloneEvalError::InvalidBindingName {
-                name: name.clone(),
-                message,
-            });
-        }
-    }
-    Ok(())
-}
-
-fn validate_root_bindings_for_preview(
-    root_bindings: &BTreeMap<String, JsonValue>,
-    expression: &str,
-) -> Result<(), ExpressionIssue> {
-    for name in root_bindings.keys() {
-        if let Err(message) = validate_root_binding_name(name) {
-            return Err(ExpressionIssue {
-                phase: ExpressionPhase::Evaluation,
-                severity: crate::errors::ErrorSeverity::Error,
-                code: ErrorCode::EvaluationError,
-                message: format!("invalid root binding name `{name}`: {message}"),
-                line: None,
-                column: None,
-                expression: expression.to_string(),
-                source_path: None,
-            });
-        }
-    }
-    Ok(())
+    crosswalk_cel::preview_cel_expression_with_input(expr, input, limits, codes)
 }
 
 pub fn validate_root_binding_name(name: &str) -> Result<(), String> {
-    if name.is_empty() {
-        return Err("name must not be empty".to_string());
-    }
-    let mut chars = name.chars();
-    let Some(first) = chars.next() else {
-        return Err("name must not be empty".to_string());
-    };
-    if !(first == '_' || first.is_ascii_alphabetic()) {
-        return Err("name must start with an ASCII letter or underscore".to_string());
-    }
-    if !chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric()) {
-        return Err("name may only contain ASCII letters, digits, and underscores".to_string());
-    }
-    if matches!(name, "true" | "false" | "null" | "in") {
-        return Err("name is reserved by CEL".to_string());
-    }
-    Ok(())
+    crosswalk_cel::validate_root_binding_name(name)
 }

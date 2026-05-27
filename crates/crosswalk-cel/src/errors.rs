@@ -45,8 +45,6 @@ pub enum ErrorSeverity {
 
 #[derive(Debug, Error)]
 pub enum CompileError {
-    #[error("YAML parse error: {0}")]
-    Yaml(#[from] serde_yaml::Error),
     #[error("CEL compile error at {path}: {message}\nexpression: {expression}")]
     Cel {
         path: String,

@@ -669,7 +669,8 @@ fn parse_publicschema_document(text: &str) -> Result<PublicSchemaMappingDocument
     if trimmed.starts_with('{') || trimmed.starts_with('[') {
         serde_json::from_str(text).map_err(|e| CompileError::Mapping(e.to_string()))
     } else {
-        serde_yaml::from_str(text).map_err(CompileError::Yaml)
+        serde_yaml::from_str(text)
+            .map_err(|err| CompileError::Mapping(format!("YAML parse error: {err}")))
     }
 }
 
@@ -789,9 +790,8 @@ fn code_entry_from_yaml(
         if matches!(key, "id" | "label" | "aliases") {
             continue;
         }
-        if let Ok(value) = serde_json::to_value(value) {
-            extra.insert(key.to_string(), value);
-        }
+        let value = serde_json::to_value(value).unwrap_or(JsonValue::Null);
+        extra.insert(key.to_string(), value);
     }
     Ok(CodeEntry {
         id,
@@ -1361,5 +1361,28 @@ mod tests {
         write_pointer(&mut out, "/items/3/name", json!("x")).unwrap();
         assert_eq!(out["items"][0], JsonValue::Null);
         assert_eq!(out["items"][3]["name"], json!("x"));
+    }
+
+    #[test]
+    fn code_entry_from_yaml_preserves_unjsonable_extra_as_null() {
+        let mut bad_extra = serde_yaml::Mapping::new();
+        bad_extra.insert(
+            serde_yaml::Value::Sequence(vec![serde_yaml::Value::String("nested".into())]),
+            serde_yaml::Value::String("x".into()),
+        );
+
+        let mut entry = serde_yaml::Mapping::new();
+        entry.insert(
+            serde_yaml::Value::String("id".into()),
+            serde_yaml::Value::String("canonical.example".into()),
+        );
+        entry.insert(
+            serde_yaml::Value::String("metadata".into()),
+            serde_yaml::Value::Mapping(bad_extra),
+        );
+
+        let parsed = code_entry_from_yaml(&serde_yaml::Value::Mapping(entry), "example").unwrap();
+
+        assert_eq!(parsed.extra.get("metadata"), Some(&JsonValue::Null));
     }
 }

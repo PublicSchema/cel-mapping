@@ -51,6 +51,37 @@ pub fn run_program(
     as_name: Option<&str>,
     extra_bindings: &[(&str, Value)],
     codes: &Arc<crosswalk_functions::codes::CodeSystemRegistry>,
+) -> Result<Value, StandaloneEvalError> {
+    run_program_raw(
+        cel,
+        source,
+        root,
+        ctx,
+        vars,
+        item,
+        index,
+        as_name,
+        extra_bindings,
+        codes,
+    )
+    .map_err(|err| StandaloneEvalError::Evaluate {
+        message: err.to_string(),
+        expression: cel.source.clone(),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_program_raw(
+    cel: &CompiledCel,
+    source: &Value,
+    root: &Value,
+    ctx: &Value,
+    vars: &Value,
+    item: Option<&Value>,
+    index: Option<i64>,
+    as_name: Option<&str>,
+    extra_bindings: &[(&str, Value)],
+    codes: &Arc<crosswalk_functions::codes::CodeSystemRegistry>,
 ) -> Result<Value, ExecutionError> {
     let mut context = Context::default();
     crosswalk_functions_cel::register_stdlib(&mut context, Arc::clone(codes));
