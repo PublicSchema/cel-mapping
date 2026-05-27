@@ -1,6 +1,7 @@
 use crosswalk_cel::{
-    evaluate_cel_expression_with_input, preview_cel_expression_with_input, SecurityLimits,
-    StandaloneEvalError, StandaloneExpressionInput,
+    compile_expr, evaluate_cel_expression_with_input, evaluate_compiled_expression_with_input,
+    preview_cel_expression_with_input, SecurityLimits, StandaloneEvalError,
+    StandaloneExpressionInput,
 };
 use crosswalk_functions::codes::CodeSystemRegistry;
 use serde_json::{json, Value as JsonValue};
@@ -117,6 +118,26 @@ fn explicit_ctx_binding_is_available() {
     .unwrap();
 
     assert_eq!(result, json!("Asia/Bangkok"));
+}
+
+#[test]
+fn evaluates_compiled_expression_with_json_bindings() {
+    let limits = SecurityLimits::default();
+    let compiled = compile_expr(
+        r#"target.name + " / " + default(profile.nickname, "N/A")"#,
+        &limits,
+        "test.expression".into(),
+    )
+    .unwrap();
+
+    let result = evaluate_compiled_expression_with_input(
+        &compiled,
+        input([("target", json!({ "name": "Ada" })), ("profile", json!({}))]),
+        codes(),
+    )
+    .unwrap();
+
+    assert_eq!(result, json!("Ada / N/A"));
 }
 
 #[test]

@@ -18,7 +18,6 @@ pub mod output;
 pub mod paths;
 pub mod security;
 
-pub use cel::Value as CelValue;
 pub use compiled::{CompiledCel, ErrorMode};
 pub use compiler::compile_expr;
 pub use crosswalk_functions;
@@ -28,8 +27,8 @@ pub use errors::{
     ExpressionPhase, ExpressionPreviewResult, MappingError, StandaloneEvalError,
 };
 pub use evaluator::{
-    evaluate_cel_expression, evaluate_cel_expression_with_input, json_to_cel,
-    preview_cel_expression, preview_cel_expression_with_input, run_program,
-    validate_root_binding_name, StandaloneExpressionInput,
+    evaluate_cel_expression, evaluate_cel_expression_with_input,
+    evaluate_compiled_expression_with_input, preview_cel_expression,
+    preview_cel_expression_with_input, validate_root_binding_name, StandaloneExpressionInput,
 };
 pub use security::SecurityLimits;

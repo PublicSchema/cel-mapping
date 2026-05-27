@@ -35,75 +35,8 @@ impl StandaloneExpressionInput {
     }
 }
 
-pub fn json_to_cel(value: &JsonValue) -> Value {
+fn json_to_cel(value: &JsonValue) -> Value {
     cel::to_value(value).unwrap_or(Value::Null)
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn run_program(
-    cel: &CompiledCel,
-    source: &Value,
-    root: &Value,
-    ctx: &Value,
-    vars: &Value,
-    item: Option<&Value>,
-    index: Option<i64>,
-    as_name: Option<&str>,
-    extra_bindings: &[(&str, Value)],
-    codes: &Arc<crosswalk_functions::codes::CodeSystemRegistry>,
-) -> Result<Value, StandaloneEvalError> {
-    run_program_raw(
-        cel,
-        source,
-        root,
-        ctx,
-        vars,
-        item,
-        index,
-        as_name,
-        extra_bindings,
-        codes,
-    )
-    .map_err(|err| StandaloneEvalError::Evaluate {
-        message: err.to_string(),
-        expression: cel.source.clone(),
-    })
-}
-
-#[allow(clippy::too_many_arguments)]
-fn run_program_raw(
-    cel: &CompiledCel,
-    source: &Value,
-    root: &Value,
-    ctx: &Value,
-    vars: &Value,
-    item: Option<&Value>,
-    index: Option<i64>,
-    as_name: Option<&str>,
-    extra_bindings: &[(&str, Value)],
-    codes: &Arc<crosswalk_functions::codes::CodeSystemRegistry>,
-) -> Result<Value, ExecutionError> {
-    let mut context = Context::default();
-    crosswalk_functions_cel::register_stdlib(&mut context, Arc::clone(codes));
-    context.add_variable_from_value("source", source.clone());
-    context.add_variable_from_value("root", root.clone());
-    context.add_variable_from_value("ctx", ctx.clone());
-    context.add_variable_from_value("vars", vars.clone());
-    if let Some(index) = index {
-        context.add_variable_from_value("index", index);
-    }
-    if let (Some(item), Some(as_name)) = (item, as_name) {
-        context.add_variable_from_value(as_name, item.clone());
-        if as_name != "item" {
-            context.add_variable_from_value("item", item.clone());
-        }
-    } else {
-        context.add_variable_from_value("item", Value::Null);
-    }
-    for (name, value) in extra_bindings {
-        context.add_variable_from_value(*name, value.clone());
-    }
-    cel.program.execute(&context)
 }
 
 fn run_program_with_root_bindings(
@@ -144,8 +77,16 @@ pub fn evaluate_cel_expression_with_input(
     limits: &SecurityLimits,
     codes: Arc<crosswalk_functions::codes::CodeSystemRegistry>,
 ) -> Result<JsonValue, StandaloneEvalError> {
-    validate_root_bindings(&input.root_bindings)?;
     let cel = compile_expr(expr, limits, "expression".into())?;
+    evaluate_compiled_expression_with_input(&cel, input, codes)
+}
+
+pub fn evaluate_compiled_expression_with_input(
+    cel: &CompiledCel,
+    input: StandaloneExpressionInput,
+    codes: Arc<crosswalk_functions::codes::CodeSystemRegistry>,
+) -> Result<JsonValue, StandaloneEvalError> {
+    validate_root_bindings(&input.root_bindings)?;
     let paths = collect_missing_aware_injection_paths(&[&cel.program]);
     let root_bindings = prepare_root_bindings(input.root_bindings, &paths);
     let value =

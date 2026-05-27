@@ -40,10 +40,10 @@ New direct crate paths:
 
 - `crosswalk_functions::{text,email,phone,date,ids,redaction,json,codes}`
 - `crosswalk_functions_cel::{register_stdlib,register_crosswalk_functions,helper_metadata}`
-- `crosswalk_cel::{compile_expr,evaluate_cel_expression,preview_cel_expression,SecurityLimits,CelValue}`
+- `crosswalk_cel::{compile_expr,evaluate_cel_expression,evaluate_compiled_expression_with_input,preview_cel_expression,SecurityLimits}`
 - `crosswalk_publicschema::{compile_publicschema_mapping,evaluate_publicschema_mapping}`
 
-`crosswalk_cel::CelValue` is an explicitly public transitional API. It is exposed so extracted crates and current integration tests can pass CEL values across the split boundary without depending on the underlying `cel` crate directly. Treat it as boundary glue rather than a long-term PublicSchema authoring surface.
+`crosswalk-cel` keeps the upstream `cel::Value` model private. Public consumers pass JSON root bindings through `StandaloneExpressionInput`; extracted crates that already hold a `CompiledCel` use `evaluate_compiled_expression_with_input` rather than passing CEL values across crate boundaries.
 
 ## Serde And Trait Notes
 

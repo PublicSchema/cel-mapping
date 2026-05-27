@@ -6,12 +6,9 @@
 //! depends on `crosswalk-cel` for expression execution and `crosswalk-functions`
 //! for code-system data, but not on the `crosswalk-core` facade.
 
-use crosswalk_cel::compile_expr;
-use crosswalk_cel::missing::MISSING_STR;
-use crosswalk_cel::output::cel_to_json;
-use crosswalk_cel::paths::{augment_json_with_paths, collect_missing_aware_injection_paths};
 use crosswalk_cel::SecurityLimits;
-use crosswalk_cel::{json_to_cel, run_program};
+use crosswalk_cel::StandaloneExpressionInput;
+use crosswalk_cel::{compile_expr, evaluate_compiled_expression_with_input};
 use crosswalk_cel::{CompileError, CompiledCel, ErrorMode};
 use crosswalk_cel::{ErrorCode, ErrorSeverity, ExpressionPreviewResult, MappingError};
 use crosswalk_functions::codes::{CodeEntry, CodeSystemDocument, CodeSystemRegistry};
@@ -918,62 +915,31 @@ fn eval_rule_expression(
     mapping: &CompiledPublicSchemaMapping,
     direction: PublicSchemaDirection,
 ) -> Result<JsonValue, String> {
-    let paths = collect_missing_aware_injection_paths(&[&cel.program]);
     // Per spec §6.1: bind ONLY the direction-appropriate alias to the input record.
     // ToTarget (forward): `target` aliases root; `profile` is absent.
     // FromTarget (reverse): `profile` aliases root; `target` is absent.
-    let mut env_map = Map::from_iter([
+    let mut root_bindings = BTreeMap::from([
         ("source".to_string(), source.clone()),
         ("root".to_string(), root.clone()),
         ("ctx".to_string(), ctx.clone()),
         ("vars".to_string(), JsonValue::Object(Map::new())),
+        ("index".to_string(), JsonValue::Null),
     ]);
     match direction {
         PublicSchemaDirection::ToTarget => {
-            env_map.insert("target".to_string(), root.clone());
+            root_bindings.insert("target".to_string(), root.clone());
         }
         PublicSchemaDirection::FromTarget => {
-            env_map.insert("profile".to_string(), root.clone());
+            root_bindings.insert("profile".to_string(), root.clone());
         }
     }
-    let mut env = JsonValue::Object(env_map);
-    augment_json_with_paths(&mut env, &paths, MISSING_STR);
-    let JsonValue::Object(obj) = &env else {
-        return Err("internal error: env binding is not an object".into());
-    };
-    let source_val = json_to_cel(obj.get("source").unwrap_or(&JsonValue::Null));
-    let root_val = json_to_cel(obj.get("root").unwrap_or(&JsonValue::Null));
-    let ctx_val = json_to_cel(obj.get("ctx").unwrap_or(&JsonValue::Null));
-    let vars_val = json_to_cel(obj.get("vars").unwrap_or(&JsonValue::Object(Map::new())));
-    let index_null = crosswalk_cel::CelValue::Null;
 
-    let mut extras: Vec<(&str, crosswalk_cel::CelValue)> = Vec::with_capacity(2);
-    match direction {
-        PublicSchemaDirection::ToTarget => {
-            let target_val = json_to_cel(obj.get("target").unwrap_or(&JsonValue::Null));
-            extras.push(("target", target_val));
-        }
-        PublicSchemaDirection::FromTarget => {
-            let profile_val = json_to_cel(obj.get("profile").unwrap_or(&JsonValue::Null));
-            extras.push(("profile", profile_val));
-        }
-    }
-    extras.push(("index", index_null));
-
-    let out = run_program(
+    evaluate_compiled_expression_with_input(
         cel,
-        &source_val,
-        &root_val,
-        &ctx_val,
-        &vars_val,
-        None,
-        None,
-        None,
-        &extras,
-        &mapping.code_systems,
+        StandaloneExpressionInput::new(root_bindings),
+        Arc::clone(&mapping.code_systems),
     )
-    .map_err(|e| e.to_string())?;
-    cel_to_json(&out)
+    .map_err(|err| err.to_string())
 }
 
 enum ValueMappingOutcome {
