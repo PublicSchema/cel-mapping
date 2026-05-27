@@ -21,7 +21,7 @@ This package is not published yet. Use a workspace or git dependency:
 
 ```toml
 [dependencies]
-crosswalk-functions = { git = "https://github.com/PublicSchema/cel-mapping", features = ["date", "phone", "redaction"] }
+crosswalk-functions = { git = "https://github.com/PublicSchema/crosswalk", features = ["date", "phone", "redaction"] }
 ```
 
 ## Feature flags

@@ -19,7 +19,7 @@ This package is not published yet. Use a workspace or git dependency:
 
 ```toml
 [dependencies]
-crosswalk-functions-cel = { git = "https://github.com/PublicSchema/cel-mapping" }
+crosswalk-functions-cel = { git = "https://github.com/PublicSchema/crosswalk" }
 ```
 
 ## Quick start

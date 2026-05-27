@@ -1,123 +1,246 @@
-# crosswalk
+# Crosswalk
 
-Deterministic **CEL** mapping runtime: YAML mapping specs → compiled expressions → JSON in/out. Rust core with optional **WASM** and **Python** bindings.
+Crosswalk is a deterministic mapping runtime for turning JSON input into JSON
+output with YAML mapping documents and CEL expressions. The runtime is written
+in Rust, with Python and WebAssembly/TypeScript bindings for application use.
 
-Full behaviour and vocabulary are defined in **[`spec.md`](./spec.md)** (v0.1). This README is the **implementation** entry point: layout, commands, and bindings.
+Use Crosswalk when you need:
 
-For the proposed PublicSchema-native runtime refactor, see **[`spec-publicschema-v0.2.md`](./spec-publicschema-v0.2.md)** and the implementation plan in **[`implementation-plan-publicschema-v0.2.md`](./implementation-plan-publicschema-v0.2.md)**.
+- A repeatable JSON-to-JSON transform runtime.
+- CEL expressions with Crosswalk helper functions for text, dates, IDs, code
+  systems, redaction, phone numbers, and JSON utilities.
+- Compile-once, evaluate-many mapping workflows.
+- The same mapping behavior from Rust, Python, browser, or TypeScript hosts.
 
-For the proposed crate-boundary refactor and reusable helper-function crates, see **[`spec-crate-split-v0.3.md`](./spec-crate-split-v0.3.md)**.
+## Status
 
-Phase 0 gate documents: **[`docs/publicschema-helper-parity.md`](./docs/publicschema-helper-parity.md)** (celext v1 helper inventory and Rust porting status) and **[`docs/publicschema-celpy-behavioral-diff.md`](./docs/publicschema-celpy-behavioral-diff.md)** (celpy behavioral diff template, to be filled before Phase 4).
+This repository is pre-release and is not published to crates.io, PyPI, or npm
+yet. Package names and crate boundaries are close to release shape, but should
+be treated as internal until the first external version is cut.
 
-## Which package should I use?
+The source repository is:
 
-Most Rust application code should start with **`crosswalk-core`**. Use the
-lower-level crates only when you need their narrower boundary.
+```text
+https://github.com/PublicSchema/crosswalk
+```
+
+## Requirements
+
+- Rust 1.83 or newer.
+- Python 3.10 through 3.13 for the Python package.
+- `wasm-pack`, the `wasm32-unknown-unknown` Rust target, Node.js, and npm for
+  the TypeScript/WASM package.
+- `uv` is recommended for Python development workflows.
+
+## Quick Start: Rust
+
+Most Rust applications should start with `crosswalk-core`.
+
+```toml
+[dependencies]
+crosswalk-core = { git = "https://github.com/PublicSchema/crosswalk" }
+serde_json = "1"
+```
+
+```rust
+use crosswalk_core::{EvaluationInput, MappingRuntime, RuntimeOptions};
+use serde_json::json;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mapping = r#"
+version: "0.1"
+name: demo
+records:
+  people:
+    fields:
+      name: "source.name"
+      country: "default(source.country, ctx.default_country)"
+"#;
+
+    let runtime = MappingRuntime::new(RuntimeOptions::default());
+    let compiled = runtime.compile_mapping(mapping)?;
+    let output = runtime.evaluate(
+        &compiled,
+        EvaluationInput {
+            source: json!({ "name": "Ada" }),
+            context: json!({ "default_country": "GB" }),
+        },
+    );
+
+    assert!(output.errors.is_empty());
+    assert_eq!(output.records["people"][0]["name"], json!("Ada"));
+    assert_eq!(output.records["people"][0]["country"], json!("GB"));
+    Ok(())
+}
+```
+
+Standalone CEL expressions are available without mapping YAML:
+
+```rust
+use crosswalk_core::{EvaluationInput, MappingRuntime, RuntimeOptions};
+use serde_json::json;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let runtime = MappingRuntime::new(RuntimeOptions::default());
+    let value = runtime.evaluate_cel_expression(
+        "source.count + 1",
+        EvaluationInput {
+            source: json!({ "count": 2 }),
+            context: json!({}),
+        },
+    )?;
+
+    assert_eq!(value, json!(3));
+    Ok(())
+}
+```
+
+## Quick Start: Python
+
+The Python package and import name are both `crosswalk`. It is backed by the
+Rust `crosswalk-python` crate.
+
+```bash
+cd crates/crosswalk-python
+uv run --extra dev python -m pytest
+```
+
+```python
+from crosswalk import MappingRuntime
+
+mapping = """
+version: "0.1"
+name: demo
+records:
+  people:
+    fields:
+      name: "source.name"
+"""
+
+runtime = MappingRuntime()
+compiled = runtime.compile_mapping(mapping)
+output = runtime.evaluate_compiled(compiled, {"name": "Ada"}, {})
+
+assert output["records"]["people"][0]["name"] == "Ada"
+```
+
+More examples live in
+[`crates/crosswalk-python/examples`](./crates/crosswalk-python/examples).
+
+## Quick Start: TypeScript and WASM
+
+The TypeScript package is `crosswalk-js`. It wraps the generated
+`crosswalk-wasm` package with an idiomatic object API.
+
+```bash
+cd packages/js
+npm ci
+npm test
+```
+
+```typescript
+import { Crosswalk } from "crosswalk-js";
+
+const mapping = `
+version: "0.1"
+name: demo
+records:
+  people:
+    fields:
+      name: "source.name"
+`;
+
+const runtime = await Crosswalk.create();
+const output = runtime.evaluate(mapping, { name: "Ada" }, {});
+
+console.log(output.records);
+```
+
+See [`packages/js/README.md`](./packages/js/README.md) for bundler notes,
+low-level WASM access, and more examples.
+
+## Which Package Should I Use?
 
 | Need | Use |
 |------|-----|
 | Compile and evaluate v0.1 mapping YAML in Rust | [`crosswalk-core`](./crates/crosswalk-core/README.md) |
 | Evaluate or preview standalone CEL expressions | [`crosswalk-cel`](./crates/crosswalk-cel/README.md) |
-| Call deterministic helper functions without CEL | [`crosswalk-functions`](./crates/crosswalk-functions/README.md) |
+| Call deterministic helpers without CEL | [`crosswalk-functions`](./crates/crosswalk-functions/README.md) |
 | Register helper functions into a CEL context | [`crosswalk-functions-cel`](./crates/crosswalk-functions-cel/README.md) |
-| Compile and evaluate PublicSchema v0.2 mappings | [`crosswalk-publicschema`](./crates/crosswalk-publicschema/README.md) or the facade in `crosswalk-core` |
-| Use Crosswalk from Python | [`crosswalk`](./crates/crosswalk-python/README.md) |
-| Use Crosswalk from browser or TypeScript | [`crosswalk-js`](./packages/js/README.md) backed by [`crosswalk-wasm`](./crates/crosswalk-wasm/README.md) |
+| Compile and evaluate PublicSchema v0.2 mappings | [`crosswalk-publicschema`](./crates/crosswalk-publicschema/README.md), or the facade in `crosswalk-core` |
+| Use Crosswalk from Python | Python package `crosswalk`, implemented by [`crosswalk-python`](./crates/crosswalk-python/README.md) |
+| Use Crosswalk from browser or TypeScript | [`crosswalk-js`](./packages/js/README.md), backed by [`crosswalk-wasm`](./crates/crosswalk-wasm/README.md) |
 
-## Documentation map
-
-| Document | Purpose |
-|----------|---------|
-| [`docs/architecture.md`](./docs/architecture.md) | Crate ownership, dependency direction, and boundary rules |
-| [`docs/extension-guide.md`](./docs/extension-guide.md) | How to add helpers, CEL behavior, PublicSchema behavior, or bindings without breaking boundaries |
-| [`docs/release-checklist.md`](./docs/release-checklist.md) | Pre-release checks for Rust crates, Python wheels, and JS/WASM package output |
-| [`docs/crate-split-inventory.md`](./docs/crate-split-inventory.md) | v0.3 split inventory, preserved pitfalls, and public re-export paths |
-
-## Layout
+## Repository Layout
 
 | Path | Role |
 |------|------|
-| [`crates/crosswalk-functions`](./crates/crosswalk-functions/README.md) | Pure deterministic helper functions, typed code-system registry, and ISO preload data with no CEL dependency |
-| [`crates/crosswalk-functions-cel`](./crates/crosswalk-functions-cel/README.md) | CEL adapter: helper registration, CEL value coercion, helper metadata, and request fallback resolution |
-| [`crates/crosswalk-cel`](./crates/crosswalk-cel/README.md) | Standalone CEL compile/evaluate/preview boundary, expression diagnostics, security limits, and helper registration |
-| [`crates/crosswalk-publicschema`](./crates/crosswalk-publicschema/README.md) | PublicSchema v0.2 property-mapping compile/evaluate runtime, JSON Pointer writes, hashes, logs, and privacy diagnostics |
-| [`crates/crosswalk-core`](./crates/crosswalk-core/README.md) | Compatibility facade and v0.1 records mapping runtime |
-| [`crates/crosswalk-wasm`](./crates/crosswalk-wasm/README.md) | `wasm-bindgen` wrapper (JSON string API) |
-| [`crates/crosswalk-python`](./crates/crosswalk-python/README.md) | PyO3 extension `crosswalk` + [`examples/`](./crates/crosswalk-python/examples/) |
-| [`packages/js`](./packages/js) | TypeScript + `wasm-pack` script targeting `wasm-pkg/` |
-| [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | `fmt` / `clippy` / tests, WASM build + TS, `maturin` + `pytest` + examples |
+| [`crates/crosswalk-functions`](./crates/crosswalk-functions/README.md) | Pure deterministic helper functions and code-system registry, with no CEL dependency |
+| [`crates/crosswalk-functions-cel`](./crates/crosswalk-functions-cel/README.md) | CEL adapter for helpers, including value conversion, arity, context fallback, warnings, and helper budgets |
+| [`crates/crosswalk-cel`](./crates/crosswalk-cel/README.md) | Standalone CEL compile, evaluate, preview, diagnostics, missing-path handling, and security limits |
+| [`crates/crosswalk-publicschema`](./crates/crosswalk-publicschema/README.md) | PublicSchema v0.2 property mapping runtime |
+| [`crates/crosswalk-core`](./crates/crosswalk-core/README.md) | v0.1 mapping runtime and compatibility facade |
+| [`crates/crosswalk-python`](./crates/crosswalk-python/README.md) | PyO3 extension that exposes the Python `crosswalk` module |
+| [`crates/crosswalk-wasm`](./crates/crosswalk-wasm/README.md) | Raw `wasm-bindgen` wrapper over `crosswalk-core` |
+| [`packages/js`](./packages/js/README.md) | TypeScript wrapper and generated WASM package workflow |
 
-Workspace `default-members` include the reusable split crates, core, and WASM so `cargo test` exercises the Rust runtime without requiring Python dev libraries. The Python crate remains a workspace member for `cargo test -p crosswalk-python` (cdylib-only; use **`pytest`** after `maturin develop`).
+The intended dependency direction and ownership rules are documented in
+[`docs/architecture.md`](./docs/architecture.md).
 
-Compatibility import paths remain available through **`crosswalk_core`** during the migration. New Rust consumers can import pure helpers from **`crosswalk_functions`**, standalone expression APIs from **`crosswalk_cel`**, PublicSchema runtime types from **`crosswalk_publicschema`**, and CEL helper registration/metadata from **`crosswalk_functions_cel`**.
+## Development
 
-## Workspace verification
+Rust workspace checks:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy -p crosswalk-core -p crosswalk-wasm --all-targets -- -D warnings
+cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo doc --workspace --no-deps
 ```
 
-Python and JS/WASM have additional package-level checks documented in
-[`crates/crosswalk-python/README.md`](./crates/crosswalk-python/README.md) and
-[`packages/js/README.md`](./packages/js/README.md).
-
-## Quick start (Rust)
+Python checks:
 
 ```bash
-cargo test -p crosswalk-core -p crosswalk-wasm
-cargo doc -p crosswalk-core --open
+cd crates/crosswalk-python
+uv run --extra dev python -m pytest
+uv run --with 'maturin>=1.5,<2' maturin build --release -m Cargo.toml
 ```
 
-Important types: **`MappingRuntime`**, **`CompiledMapping`**, **`EvaluationInput`**, **`MappingOutput`**, **`ExpressionPreviewResult`** (see `crosswalk_core::errors` and `preview_cel_expression`).
-
-### Compile once, evaluate many
-
-```rust
-let rt = MappingRuntime::new(RuntimeOptions::default());
-let compiled = rt.compile_mapping(yaml)?;
-let out = rt.evaluate(&compiled, EvaluationInput { source, context });
-```
-
-### Standalone expression (no mapping YAML)
-
-- **`evaluate_cel_expression`** / **`MappingRuntime::evaluate_cel_expression`**: same bindings as a field expression (`source`, `ctx`, stdlib); takes **`EvaluationInput`**; returns `Result<JsonValue, StandaloneEvalError>`.
-- **`preview_cel_expression`** / **`MappingRuntime::preview_cel_expression`**: **editor-oriented**: same `expr` + **`EvaluationInput`**; always returns **`ExpressionPreviewResult`** with `author_expression`, optional `rewritten_expression`, `value`, `issues` (syntax uses CEL’s full diagnostic + line/column in the **rewritten** buffer), and `notes` for tools/LLMs.
-
-The crate-root free functions **`crosswalk_core::evaluator::evaluate_cel_expression`** / **`preview_cel_expression`** take raw `source` / `ctx` JSON plus `SecurityLimits` and a code-system registry for lower-level use.
-
-## Python
-
-See **[`crates/crosswalk-python/README.md`](./crates/crosswalk-python/README.md)** for `maturin develop`, `pytest`, and runnable **`examples/*.py`**.
-
-Summary:
-
-- **`MappingRuntime`**, **`CompiledMapping`**, **`MappingCompileError`**
-- Dict-first API: **`evaluate`**, **`evaluate_compiled`**, **`preview_expression`**, **`evaluate_expression`**
-- JSON-string helpers retained for interop: **`evaluate_json`**, **`set_limits_json`**, etc.
-
-## JavaScript / WASM
-
-Requires [`wasm-pack`](https://rustwasm.github.io/wasm-pack/) and the **`wasm32-unknown-unknown`** target. From **`packages/js`** (so `--out-dir` resolves next to this package):
+TypeScript and WASM checks:
 
 ```bash
-cd packages/js && npm ci && npm test
+cd packages/js
+npm ci
+npm test
 ```
 
-The **`test`** script builds WASM, builds TypeScript, and runs Node smoke tests
-against the generated package. The **`build:wasm`** script runs `wasm-pack`
-with the correct `--out-dir` for this repo layout and prefers rustup-managed
-Rust when it is installed.
+Workspace `default-members` include the reusable split crates, `crosswalk-core`,
+and `crosswalk-wasm`. The Python crate remains a workspace member, but its
+runtime behavior is best verified with pytest after Maturin builds the extension.
 
-For **idiomatic TypeScript** (`Crosswalk`, camelCase, object I/O) and **copy-paste examples**, see **[`packages/js/README.md`](./packages/js/README.md)**. The WASM class exposes JSON-oriented methods such as **`evaluate_json`**, **`compile_mapping_meta`**, **`set_limits_json`**, **`set_runtime_options_json`**, **`evaluate_expression_json`** (single CEL expression, `{"ok":true,"value":…}` / `{"ok":false,"error":…}`), and **`preview_expression_json`** (editor-oriented `ExpressionPreviewResult` JSON). See `crates/crosswalk-wasm/src/lib.rs` and `packages/js/src/index.ts` for helpers.
+## Runtime Notes
 
-## Runtime options vs mapping YAML
+Mapping document `errors.mode` (`strict`, `collect`, or `lenient`) wins when it
+is set. If a mapping omits it, `RuntimeOptions::default_errors_mode` applies.
 
-Mapping document **`errors.mode`** (`strict` / `collect` / `lenient`) wins when set. If it is omitted, **`RuntimeOptions::default_errors_mode`** applies (see `MappingRuntime::compile_mapping`).
+Compatibility import paths remain available through `crosswalk_core` during the
+crate-split migration. New code should prefer the narrowest crate that owns the
+behavior it needs.
 
-## Licence
+## Documentation
 
-See workspace `Cargo.toml` (`license` field).
+| Document | Purpose |
+|----------|---------|
+| [`docs/architecture.md`](./docs/architecture.md) | Crate ownership, dependency direction, and boundary rules |
+| [`docs/extension-guide.md`](./docs/extension-guide.md) | How to add helpers, CEL behavior, PublicSchema behavior, or bindings |
+| [`docs/release-checklist.md`](./docs/release-checklist.md) | Pre-release checks for Rust crates, Python wheels, and JS/WASM output |
+| [`docs/crate-split-inventory.md`](./docs/crate-split-inventory.md) | Current v0.3 split inventory, preserved pitfalls, and public re-export paths |
+| [`spec.md`](./spec.md) | v0.1 mapping behavior and vocabulary |
+| [`spec-publicschema-v0.2.md`](./spec-publicschema-v0.2.md) | PublicSchema-native mapping runtime specification |
+| [`spec-crate-split-v0.3.md`](./spec-crate-split-v0.3.md) | Crate-boundary split specification |
+| [`implementation-plan-publicschema-v0.2.md`](./implementation-plan-publicschema-v0.2.md) | PublicSchema implementation plan |
+
+## License
+
+Licensed under `MIT OR Apache-2.0`. See the workspace
+[`Cargo.toml`](./Cargo.toml).

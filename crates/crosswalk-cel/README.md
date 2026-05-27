@@ -23,7 +23,7 @@ This package is not published yet. Use a workspace or git dependency:
 
 ```toml
 [dependencies]
-crosswalk-cel = { git = "https://github.com/PublicSchema/cel-mapping" }
+crosswalk-cel = { git = "https://github.com/PublicSchema/crosswalk" }
 serde_json = "1"
 ```
 
