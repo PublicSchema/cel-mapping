@@ -20,8 +20,6 @@ pub mod security;
 
 pub use compiled::{CompiledCel, ErrorMode};
 pub use compiler::compile_expr;
-pub use crosswalk_functions;
-pub use crosswalk_functions_cel;
 pub use errors::{
     truncate_diagnostic_string, CompileError, ErrorCode, ErrorSeverity, ExpressionIssue,
     ExpressionPhase, ExpressionPreviewResult, MappingError, StandaloneEvalError,
