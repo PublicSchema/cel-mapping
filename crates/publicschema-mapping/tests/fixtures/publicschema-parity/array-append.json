@@ -1,0 +1,30 @@
+{
+  "name": "array-append",
+  "mapping": {
+    "version": "0.2",
+    "id": "array-append",
+    "property_mappings": [
+      {
+        "id": "append-id",
+        "source": "/system_id",
+        "target": "/identifiers/-"
+      }
+    ]
+  },
+  "direction": "to_target",
+  "source_data": {
+    "system_id": "abc-123"
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": true,
+    "output": { "identifiers": ["abc-123"] },
+    "errors_count": 0,
+    "warnings_count": 0,
+    "log_statuses": ["applied"]
+  }
+}

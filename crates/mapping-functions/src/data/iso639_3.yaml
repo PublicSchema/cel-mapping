@@ -1,0 +1,556 @@
+# ISO 639 alpha-2 to alpha-3 mapping. Source key = alpha-2 (or alpha-3 if no alpha-2 exists);
+# id = ISO 639-3 alpha-3 code. Aliases include the alpha-3 code itself.
+# Covers the ~180 codes with both alpha-2 and alpha-3 forms per ISO 639-1/639-3.
+# Generated from ISO 639-3 (2024-12). Regenerate via scripts/gen_iso639.py if updated.
+aa:
+  id: aar
+  aliases: [aar]
+ab:
+  id: abk
+  aliases: [abk]
+ae:
+  id: ave
+  aliases: [ave]
+af:
+  id: afr
+  aliases: [afr]
+ak:
+  id: aka
+  aliases: [aka]
+am:
+  id: amh
+  aliases: [amh]
+an:
+  id: arg
+  aliases: [arg]
+ar:
+  id: ara
+  aliases: [ara]
+as:
+  id: asm
+  aliases: [asm]
+av:
+  id: ava
+  aliases: [ava]
+ay:
+  id: aym
+  aliases: [aym]
+az:
+  id: aze
+  aliases: [aze]
+ba:
+  id: bak
+  aliases: [bak]
+be:
+  id: bel
+  aliases: [bel]
+bg:
+  id: bul
+  aliases: [bul]
+bh:
+  id: bih
+  aliases: [bih]
+bi:
+  id: bis
+  aliases: [bis]
+bm:
+  id: bam
+  aliases: [bam]
+bn:
+  id: ben
+  aliases: [ben]
+bo:
+  id: tib
+  aliases: [tib, bod]
+br:
+  id: bre
+  aliases: [bre]
+bs:
+  id: bos
+  aliases: [bos]
+ca:
+  id: cat
+  aliases: [cat]
+ce:
+  id: che
+  aliases: [che]
+ch:
+  id: cha
+  aliases: [cha]
+co:
+  id: cos
+  aliases: [cos]
+cr:
+  id: cre
+  aliases: [cre]
+cs:
+  id: ces
+  aliases: [ces, cze]
+cu:
+  id: chu
+  aliases: [chu]
+cv:
+  id: chv
+  aliases: [chv]
+cy:
+  id: wel
+  aliases: [wel, cym]
+da:
+  id: dan
+  aliases: [dan]
+de:
+  id: deu
+  aliases: [deu, ger]
+dv:
+  id: div
+  aliases: [div]
+dz:
+  id: dzo
+  aliases: [dzo]
+ee:
+  id: ewe
+  aliases: [ewe]
+el:
+  id: ell
+  aliases: [ell, gre]
+en:
+  id: eng
+  aliases: [eng]
+eo:
+  id: epo
+  aliases: [epo]
+es:
+  id: spa
+  aliases: [spa]
+et:
+  id: est
+  aliases: [est]
+eu:
+  id: eus
+  aliases: [eus, baq]
+fa:
+  id: fas
+  aliases: [fas, per]
+ff:
+  id: ful
+  aliases: [ful]
+fi:
+  id: fin
+  aliases: [fin]
+fj:
+  id: fij
+  aliases: [fij]
+fo:
+  id: fao
+  aliases: [fao]
+fr:
+  id: fra
+  aliases: [fra, fre]
+fy:
+  id: fry
+  aliases: [fry]
+ga:
+  id: gle
+  aliases: [gle]
+gd:
+  id: gla
+  aliases: [gla]
+gl:
+  id: glg
+  aliases: [glg]
+gn:
+  id: grn
+  aliases: [grn]
+gu:
+  id: guj
+  aliases: [guj]
+gv:
+  id: glv
+  aliases: [glv]
+ha:
+  id: hau
+  aliases: [hau]
+he:
+  id: heb
+  aliases: [heb]
+hi:
+  id: hin
+  aliases: [hin]
+ho:
+  id: hmo
+  aliases: [hmo]
+hr:
+  id: hrv
+  aliases: [hrv]
+ht:
+  id: hat
+  aliases: [hat]
+hu:
+  id: hun
+  aliases: [hun]
+hy:
+  id: hye
+  aliases: [hye, arm]
+hz:
+  id: her
+  aliases: [her]
+ia:
+  id: ina
+  aliases: [ina]
+id:
+  id: ind
+  aliases: [ind]
+ie:
+  id: ile
+  aliases: [ile]
+ig:
+  id: ibo
+  aliases: [ibo]
+ii:
+  id: iii
+  aliases: [iii]
+ik:
+  id: ipk
+  aliases: [ipk]
+io:
+  id: ido
+  aliases: [ido]
+is:
+  id: isl
+  aliases: [isl, ice]
+it:
+  id: ita
+  aliases: [ita]
+iu:
+  id: iku
+  aliases: [iku]
+ja:
+  id: jpn
+  aliases: [jpn]
+jv:
+  id: jav
+  aliases: [jav]
+ka:
+  id: kat
+  aliases: [kat, geo]
+kg:
+  id: kon
+  aliases: [kon]
+ki:
+  id: kik
+  aliases: [kik]
+kj:
+  id: kua
+  aliases: [kua]
+kk:
+  id: kaz
+  aliases: [kaz]
+kl:
+  id: kal
+  aliases: [kal]
+km:
+  id: khm
+  aliases: [khm]
+kn:
+  id: kan
+  aliases: [kan]
+ko:
+  id: kor
+  aliases: [kor]
+kr:
+  id: kau
+  aliases: [kau]
+ks:
+  id: kas
+  aliases: [kas]
+ku:
+  id: kur
+  aliases: [kur]
+kv:
+  id: kom
+  aliases: [kom]
+kw:
+  id: cor
+  aliases: [cor]
+ky:
+  id: kir
+  aliases: [kir]
+la:
+  id: lat
+  aliases: [lat]
+lb:
+  id: ltz
+  aliases: [ltz]
+lg:
+  id: lug
+  aliases: [lug]
+li:
+  id: lim
+  aliases: [lim]
+ln:
+  id: lin
+  aliases: [lin]
+lo:
+  id: lao
+  aliases: [lao]
+lt:
+  id: lit
+  aliases: [lit]
+lu:
+  id: lub
+  aliases: [lub]
+lv:
+  id: lav
+  aliases: [lav]
+mg:
+  id: mlg
+  aliases: [mlg]
+mh:
+  id: mah
+  aliases: [mah]
+mi:
+  id: mri
+  aliases: [mri, mao]
+mk:
+  id: mkd
+  aliases: [mkd, mac]
+ml:
+  id: mal
+  aliases: [mal]
+mn:
+  id: mon
+  aliases: [mon]
+mr:
+  id: mar
+  aliases: [mar]
+ms:
+  id: msa
+  aliases: [msa, may]
+mt:
+  id: mlt
+  aliases: [mlt]
+my:
+  id: mya
+  aliases: [mya, bur]
+na:
+  id: nau
+  aliases: [nau]
+nb:
+  id: nob
+  aliases: [nob]
+nd:
+  id: nde
+  aliases: [nde]
+ne:
+  id: nep
+  aliases: [nep]
+ng:
+  id: ndo
+  aliases: [ndo]
+nl:
+  id: nld
+  aliases: [nld, dut]
+nn:
+  id: nno
+  aliases: [nno]
+"no":
+  id: nor
+  aliases: [nor]
+nr:
+  id: nbl
+  aliases: [nbl]
+nv:
+  id: nav
+  aliases: [nav]
+ny:
+  id: nya
+  aliases: [nya]
+oc:
+  id: oci
+  aliases: [oci]
+oj:
+  id: oji
+  aliases: [oji]
+om:
+  id: orm
+  aliases: [orm]
+or:
+  id: ori
+  aliases: [ori]
+os:
+  id: oss
+  aliases: [oss]
+pa:
+  id: pan
+  aliases: [pan]
+pi:
+  id: pli
+  aliases: [pli]
+pl:
+  id: pol
+  aliases: [pol]
+ps:
+  id: pus
+  aliases: [pus]
+pt:
+  id: por
+  aliases: [por]
+qu:
+  id: que
+  aliases: [que]
+rm:
+  id: roh
+  aliases: [roh]
+rn:
+  id: run
+  aliases: [run]
+ro:
+  id: ron
+  aliases: [ron, rum]
+ru:
+  id: rus
+  aliases: [rus]
+rw:
+  id: kin
+  aliases: [kin]
+sa:
+  id: san
+  aliases: [san]
+sc:
+  id: srd
+  aliases: [srd]
+sd:
+  id: snd
+  aliases: [snd]
+se:
+  id: sme
+  aliases: [sme]
+sg:
+  id: sag
+  aliases: [sag]
+si:
+  id: sin
+  aliases: [sin]
+sk:
+  id: slk
+  aliases: [slk, slo]
+sl:
+  id: slv
+  aliases: [slv]
+sm:
+  id: smo
+  aliases: [smo]
+sn:
+  id: sna
+  aliases: [sna]
+so:
+  id: som
+  aliases: [som]
+sq:
+  id: sqi
+  aliases: [sqi, alb]
+sr:
+  id: srp
+  aliases: [srp]
+ss:
+  id: ssw
+  aliases: [ssw]
+st:
+  id: sot
+  aliases: [sot]
+su:
+  id: sun
+  aliases: [sun]
+sv:
+  id: swe
+  aliases: [swe]
+sw:
+  id: swa
+  aliases: [swa]
+ta:
+  id: tam
+  aliases: [tam]
+te:
+  id: tel
+  aliases: [tel]
+tg:
+  id: tgk
+  aliases: [tgk]
+th:
+  id: tha
+  aliases: [tha]
+ti:
+  id: tir
+  aliases: [tir]
+tk:
+  id: tuk
+  aliases: [tuk]
+tl:
+  id: tgl
+  aliases: [tgl]
+tn:
+  id: tsn
+  aliases: [tsn]
+to:
+  id: ton
+  aliases: [ton]
+tr:
+  id: tur
+  aliases: [tur]
+ts:
+  id: tso
+  aliases: [tso]
+tt:
+  id: tat
+  aliases: [tat]
+tw:
+  id: twi
+  aliases: [twi]
+ty:
+  id: tah
+  aliases: [tah]
+ug:
+  id: uig
+  aliases: [uig]
+uk:
+  id: ukr
+  aliases: [ukr]
+ur:
+  id: urd
+  aliases: [urd]
+uz:
+  id: uzb
+  aliases: [uzb]
+ve:
+  id: ven
+  aliases: [ven]
+vi:
+  id: vie
+  aliases: [vie]
+vo:
+  id: vol
+  aliases: [vol]
+wa:
+  id: wln
+  aliases: [wln]
+wo:
+  id: wol
+  aliases: [wol]
+xh:
+  id: xho
+  aliases: [xho]
+yi:
+  id: yid
+  aliases: [yid]
+yo:
+  id: yor
+  aliases: [yor]
+za:
+  id: zha
+  aliases: [zha]
+zh:
+  id: zho
+  aliases: [zho, chi]
+zu:
+  id: zul
+  aliases: [zul]

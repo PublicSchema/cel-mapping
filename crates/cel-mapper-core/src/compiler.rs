@@ -3,10 +3,8 @@ use crate::compiled::{
     CompiledCel, CompiledField, CompiledMapping, CompiledRecord, CompiledValidation, ErrorMode,
 };
 use crate::errors::CompileError;
-use crate::expr::rewrite_namespaced_calls;
 use crate::mapping::MappingDocument;
 use crate::security::SecurityLimits;
-use cel::Program;
 use std::sync::Arc;
 
 /// `runtime_default_errors_mode` applies only when the mapping YAML does not set `errors.mode`.
@@ -17,8 +15,7 @@ pub fn compile_mapping_yaml(
     runtime_default_errors_mode: Option<&str>,
 ) -> Result<CompiledMapping, CompileError> {
     let doc: MappingDocument = serde_yaml::from_str(yaml)?;
-    registry
-        .merge_from_map(&doc.code_systems)
+    crate::code_system::merge_from_map(&mut registry, &doc.code_systems)
         .map_err(|e| CompileError::Mapping(e.to_string()))?;
     let reg = Arc::new(registry);
 
@@ -114,13 +111,5 @@ pub(crate) fn compile_expr(
     limits: &SecurityLimits,
     path: String,
 ) -> Result<CompiledCel, CompileError> {
-    limits.check_expr(src).map_err(CompileError::Mapping)?;
-    let source = src.to_string();
-    let rewritten = rewrite_namespaced_calls(src);
-    let program = Program::compile(&rewritten).map_err(|e| CompileError::Cel {
-        path: path.clone(),
-        expression: source.clone(),
-        message: e.to_string(),
-    })?;
-    Ok(CompiledCel { program, source })
+    cel_evaluator::compile_expr(src, limits, path)
 }

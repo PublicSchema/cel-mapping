@@ -345,6 +345,7 @@ impl PyMappingRuntime {
     /// Evaluate a compiled PublicSchema v0.2 mapping. Returns
     /// {"ok": bool, "output": ..., "log": ..., "warnings": ..., "errors": ...}.
     #[pyo3(signature = (compiled, source, context=None, direction=None, errors_mode=None, privacy=None))]
+    #[allow(clippy::too_many_arguments)]
     fn evaluate_publicschema_compiled(
         &self,
         py: Python<'_>,
@@ -455,6 +456,7 @@ impl PyMappingRuntime {
     }
 
     #[pyo3(signature = (mapping, source, context=None, direction=None, errors_mode=None, privacy=None))]
+    #[allow(clippy::too_many_arguments)]
     fn evaluate_publicschema(
         &self,
         py: Python<'_>,

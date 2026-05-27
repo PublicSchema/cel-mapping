@@ -1,0 +1,750 @@
+# ISO 3166-1 alpha-2 to alpha-3 mapping. Source key = alpha-2; id = alpha-3.
+# Aliases include the alpha-3 code itself so lookups on already-canonical values succeed.
+# Generated from ISO 3166-1 (2024-12). Regenerate via scripts/gen_iso3166.py if updated.
+AD:
+  id: AND
+  aliases: [AND]
+AE:
+  id: ARE
+  aliases: [ARE]
+AF:
+  id: AFG
+  aliases: [AFG]
+AG:
+  id: ATG
+  aliases: [ATG]
+AI:
+  id: AIA
+  aliases: [AIA]
+AL:
+  id: ALB
+  aliases: [ALB]
+AM:
+  id: ARM
+  aliases: [ARM]
+AO:
+  id: AGO
+  aliases: [AGO]
+AQ:
+  id: ATA
+  aliases: [ATA]
+AR:
+  id: ARG
+  aliases: [ARG]
+AS:
+  id: ASM
+  aliases: [ASM]
+AT:
+  id: AUT
+  aliases: [AUT]
+AU:
+  id: AUS
+  aliases: [AUS]
+AW:
+  id: ABW
+  aliases: [ABW]
+AX:
+  id: ALA
+  aliases: [ALA]
+AZ:
+  id: AZE
+  aliases: [AZE]
+BA:
+  id: BIH
+  aliases: [BIH]
+BB:
+  id: BRB
+  aliases: [BRB]
+BD:
+  id: BGD
+  aliases: [BGD]
+BE:
+  id: BEL
+  aliases: [BEL]
+BF:
+  id: BFA
+  aliases: [BFA]
+BG:
+  id: BGR
+  aliases: [BGR]
+BH:
+  id: BHR
+  aliases: [BHR]
+BI:
+  id: BDI
+  aliases: [BDI]
+BJ:
+  id: BEN
+  aliases: [BEN]
+BL:
+  id: BLM
+  aliases: [BLM]
+BM:
+  id: BMU
+  aliases: [BMU]
+BN:
+  id: BRN
+  aliases: [BRN]
+BO:
+  id: BOL
+  aliases: [BOL]
+BQ:
+  id: BES
+  aliases: [BES]
+BR:
+  id: BRA
+  aliases: [BRA]
+BS:
+  id: BHS
+  aliases: [BHS]
+BT:
+  id: BTN
+  aliases: [BTN]
+BV:
+  id: BVT
+  aliases: [BVT]
+BW:
+  id: BWA
+  aliases: [BWA]
+BY:
+  id: BLR
+  aliases: [BLR]
+BZ:
+  id: BLZ
+  aliases: [BLZ]
+CA:
+  id: CAN
+  aliases: [CAN]
+CC:
+  id: CCK
+  aliases: [CCK]
+CD:
+  id: COD
+  aliases: [COD]
+CF:
+  id: CAF
+  aliases: [CAF]
+CG:
+  id: COG
+  aliases: [COG]
+CH:
+  id: CHE
+  aliases: [CHE]
+CI:
+  id: CIV
+  aliases: [CIV]
+CK:
+  id: COK
+  aliases: [COK]
+CL:
+  id: CHL
+  aliases: [CHL]
+CM:
+  id: CMR
+  aliases: [CMR]
+CN:
+  id: CHN
+  aliases: [CHN]
+CO:
+  id: COL
+  aliases: [COL]
+CR:
+  id: CRI
+  aliases: [CRI]
+CU:
+  id: CUB
+  aliases: [CUB]
+CV:
+  id: CPV
+  aliases: [CPV]
+CW:
+  id: CUW
+  aliases: [CUW]
+CX:
+  id: CXR
+  aliases: [CXR]
+CY:
+  id: CYP
+  aliases: [CYP]
+CZ:
+  id: CZE
+  aliases: [CZE]
+DE:
+  id: DEU
+  aliases: [DEU]
+DJ:
+  id: DJI
+  aliases: [DJI]
+DK:
+  id: DNK
+  aliases: [DNK]
+DM:
+  id: DMA
+  aliases: [DMA]
+DO:
+  id: DOM
+  aliases: [DOM]
+DZ:
+  id: DZA
+  aliases: [DZA]
+EC:
+  id: ECU
+  aliases: [ECU]
+EE:
+  id: EST
+  aliases: [EST]
+EG:
+  id: EGY
+  aliases: [EGY]
+EH:
+  id: ESH
+  aliases: [ESH]
+ER:
+  id: ERI
+  aliases: [ERI]
+ES:
+  id: ESP
+  aliases: [ESP]
+ET:
+  id: ETH
+  aliases: [ETH]
+FI:
+  id: FIN
+  aliases: [FIN]
+FJ:
+  id: FJI
+  aliases: [FJI]
+FK:
+  id: FLK
+  aliases: [FLK]
+FM:
+  id: FSM
+  aliases: [FSM]
+FO:
+  id: FRO
+  aliases: [FRO]
+FR:
+  id: FRA
+  aliases: [FRA]
+GA:
+  id: GAB
+  aliases: [GAB]
+GB:
+  id: GBR
+  aliases: [GBR]
+GD:
+  id: GRD
+  aliases: [GRD]
+GE:
+  id: GEO
+  aliases: [GEO]
+GF:
+  id: GUF
+  aliases: [GUF]
+GG:
+  id: GGY
+  aliases: [GGY]
+GH:
+  id: GHA
+  aliases: [GHA]
+GI:
+  id: GIB
+  aliases: [GIB]
+GL:
+  id: GRL
+  aliases: [GRL]
+GM:
+  id: GMB
+  aliases: [GMB]
+GN:
+  id: GIN
+  aliases: [GIN]
+GP:
+  id: GLP
+  aliases: [GLP]
+GQ:
+  id: GNQ
+  aliases: [GNQ]
+GR:
+  id: GRC
+  aliases: [GRC]
+GS:
+  id: SGS
+  aliases: [SGS]
+GT:
+  id: GTM
+  aliases: [GTM]
+GU:
+  id: GUM
+  aliases: [GUM]
+GW:
+  id: GNB
+  aliases: [GNB]
+GY:
+  id: GUY
+  aliases: [GUY]
+HK:
+  id: HKG
+  aliases: [HKG]
+HM:
+  id: HMD
+  aliases: [HMD]
+HN:
+  id: HND
+  aliases: [HND]
+HR:
+  id: HRV
+  aliases: [HRV]
+HT:
+  id: HTI
+  aliases: [HTI]
+HU:
+  id: HUN
+  aliases: [HUN]
+ID:
+  id: IDN
+  aliases: [IDN]
+IE:
+  id: IRL
+  aliases: [IRL]
+IL:
+  id: ISR
+  aliases: [ISR]
+IM:
+  id: IMN
+  aliases: [IMN]
+IN:
+  id: IND
+  aliases: [IND]
+IO:
+  id: IOT
+  aliases: [IOT]
+IQ:
+  id: IRQ
+  aliases: [IRQ]
+IR:
+  id: IRN
+  aliases: [IRN]
+IS:
+  id: ISL
+  aliases: [ISL]
+IT:
+  id: ITA
+  aliases: [ITA]
+JE:
+  id: JEY
+  aliases: [JEY]
+JM:
+  id: JAM
+  aliases: [JAM]
+JO:
+  id: JOR
+  aliases: [JOR]
+JP:
+  id: JPN
+  aliases: [JPN]
+KE:
+  id: KEN
+  aliases: [KEN]
+KG:
+  id: KGZ
+  aliases: [KGZ]
+KH:
+  id: KHM
+  aliases: [KHM]
+KI:
+  id: KIR
+  aliases: [KIR]
+KM:
+  id: COM
+  aliases: [COM]
+KN:
+  id: KNA
+  aliases: [KNA]
+KP:
+  id: PRK
+  aliases: [PRK]
+KR:
+  id: KOR
+  aliases: [KOR]
+KW:
+  id: KWT
+  aliases: [KWT]
+KY:
+  id: CYM
+  aliases: [CYM]
+KZ:
+  id: KAZ
+  aliases: [KAZ]
+LA:
+  id: LAO
+  aliases: [LAO]
+LB:
+  id: LBN
+  aliases: [LBN]
+LC:
+  id: LCA
+  aliases: [LCA]
+LI:
+  id: LIE
+  aliases: [LIE]
+LK:
+  id: LKA
+  aliases: [LKA]
+LR:
+  id: LBR
+  aliases: [LBR]
+LS:
+  id: LSO
+  aliases: [LSO]
+LT:
+  id: LTU
+  aliases: [LTU]
+LU:
+  id: LUX
+  aliases: [LUX]
+LV:
+  id: LVA
+  aliases: [LVA]
+LY:
+  id: LBY
+  aliases: [LBY]
+MA:
+  id: MAR
+  aliases: [MAR]
+MC:
+  id: MCO
+  aliases: [MCO]
+MD:
+  id: MDA
+  aliases: [MDA]
+ME:
+  id: MNE
+  aliases: [MNE]
+MF:
+  id: MAF
+  aliases: [MAF]
+MG:
+  id: MDG
+  aliases: [MDG]
+MH:
+  id: MHL
+  aliases: [MHL]
+MK:
+  id: MKD
+  aliases: [MKD]
+ML:
+  id: MLI
+  aliases: [MLI]
+MM:
+  id: MMR
+  aliases: [MMR]
+MN:
+  id: MNG
+  aliases: [MNG]
+MO:
+  id: MAC
+  aliases: [MAC]
+MP:
+  id: MNP
+  aliases: [MNP]
+MQ:
+  id: MTQ
+  aliases: [MTQ]
+MR:
+  id: MRT
+  aliases: [MRT]
+MS:
+  id: MSR
+  aliases: [MSR]
+MT:
+  id: MLT
+  aliases: [MLT]
+MU:
+  id: MUS
+  aliases: [MUS]
+MV:
+  id: MDV
+  aliases: [MDV]
+MW:
+  id: MWI
+  aliases: [MWI]
+MX:
+  id: MEX
+  aliases: [MEX]
+MY:
+  id: MYS
+  aliases: [MYS]
+MZ:
+  id: MOZ
+  aliases: [MOZ]
+NA:
+  id: NAM
+  aliases: [NAM]
+NC:
+  id: NCL
+  aliases: [NCL]
+NE:
+  id: NER
+  aliases: [NER]
+NF:
+  id: NFK
+  aliases: [NFK]
+NG:
+  id: NGA
+  aliases: [NGA]
+NI:
+  id: NIC
+  aliases: [NIC]
+NL:
+  id: NLD
+  aliases: [NLD]
+NO:
+  id: NOR
+  aliases: [NOR]
+NP:
+  id: NPL
+  aliases: [NPL]
+NR:
+  id: NRU
+  aliases: [NRU]
+NU:
+  id: NIU
+  aliases: [NIU]
+NZ:
+  id: NZL
+  aliases: [NZL]
+OM:
+  id: OMN
+  aliases: [OMN]
+PA:
+  id: PAN
+  aliases: [PAN]
+PE:
+  id: PER
+  aliases: [PER]
+PF:
+  id: PYF
+  aliases: [PYF]
+PG:
+  id: PNG
+  aliases: [PNG]
+PH:
+  id: PHL
+  aliases: [PHL]
+PK:
+  id: PAK
+  aliases: [PAK]
+PL:
+  id: POL
+  aliases: [POL]
+PM:
+  id: SPM
+  aliases: [SPM]
+PN:
+  id: PCN
+  aliases: [PCN]
+PR:
+  id: PRI
+  aliases: [PRI]
+PS:
+  id: PSE
+  aliases: [PSE]
+PT:
+  id: PRT
+  aliases: [PRT]
+PW:
+  id: PLW
+  aliases: [PLW]
+PY:
+  id: PRY
+  aliases: [PRY]
+QA:
+  id: QAT
+  aliases: [QAT]
+RE:
+  id: REU
+  aliases: [REU]
+RO:
+  id: ROU
+  aliases: [ROU]
+RS:
+  id: SRB
+  aliases: [SRB]
+RU:
+  id: RUS
+  aliases: [RUS]
+RW:
+  id: RWA
+  aliases: [RWA]
+SA:
+  id: SAU
+  aliases: [SAU]
+SB:
+  id: SLB
+  aliases: [SLB]
+SC:
+  id: SYC
+  aliases: [SYC]
+SD:
+  id: SDN
+  aliases: [SDN]
+SE:
+  id: SWE
+  aliases: [SWE]
+SG:
+  id: SGP
+  aliases: [SGP]
+SH:
+  id: SHN
+  aliases: [SHN]
+SI:
+  id: SVN
+  aliases: [SVN]
+SJ:
+  id: SJM
+  aliases: [SJM]
+SK:
+  id: SVK
+  aliases: [SVK]
+SL:
+  id: SLE
+  aliases: [SLE]
+SM:
+  id: SMR
+  aliases: [SMR]
+SN:
+  id: SEN
+  aliases: [SEN]
+SO:
+  id: SOM
+  aliases: [SOM]
+SR:
+  id: SUR
+  aliases: [SUR]
+SS:
+  id: SSD
+  aliases: [SSD]
+ST:
+  id: STP
+  aliases: [STP]
+SV:
+  id: SLV
+  aliases: [SLV]
+SX:
+  id: SXM
+  aliases: [SXM]
+SY:
+  id: SYR
+  aliases: [SYR]
+SZ:
+  id: SWZ
+  aliases: [SWZ]
+TC:
+  id: TCA
+  aliases: [TCA]
+TD:
+  id: TCD
+  aliases: [TCD]
+TF:
+  id: ATF
+  aliases: [ATF]
+TG:
+  id: TGO
+  aliases: [TGO]
+TH:
+  id: THA
+  aliases: [THA]
+TJ:
+  id: TJK
+  aliases: [TJK]
+TK:
+  id: TKL
+  aliases: [TKL]
+TL:
+  id: TLS
+  aliases: [TLS]
+TM:
+  id: TKM
+  aliases: [TKM]
+TN:
+  id: TUN
+  aliases: [TUN]
+TO:
+  id: TON
+  aliases: [TON]
+TR:
+  id: TUR
+  aliases: [TUR]
+TT:
+  id: TTO
+  aliases: [TTO]
+TV:
+  id: TUV
+  aliases: [TUV]
+TW:
+  id: TWN
+  aliases: [TWN]
+TZ:
+  id: TZA
+  aliases: [TZA]
+UA:
+  id: UKR
+  aliases: [UKR]
+UG:
+  id: UGA
+  aliases: [UGA]
+UM:
+  id: UMI
+  aliases: [UMI]
+US:
+  id: USA
+  aliases: [USA]
+UY:
+  id: URY
+  aliases: [URY]
+UZ:
+  id: UZB
+  aliases: [UZB]
+VA:
+  id: VAT
+  aliases: [VAT]
+VC:
+  id: VCT
+  aliases: [VCT]
+VE:
+  id: VEN
+  aliases: [VEN]
+VG:
+  id: VGB
+  aliases: [VGB]
+VI:
+  id: VIR
+  aliases: [VIR]
+VN:
+  id: VNM
+  aliases: [VNM]
+VU:
+  id: VUT
+  aliases: [VUT]
+WF:
+  id: WLF
+  aliases: [WLF]
+WS:
+  id: WSM
+  aliases: [WSM]
+YE:
+  id: YEM
+  aliases: [YEM]
+YT:
+  id: MYT
+  aliases: [MYT]
+ZA:
+  id: ZAF
+  aliases: [ZAF]
+ZM:
+  id: ZMB
+  aliases: [ZMB]
+ZW:
+  id: ZWE
+  aliases: [ZWE]

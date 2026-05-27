@@ -1,0 +1,35 @@
+{
+  "name": "formula-error-fails-closed",
+  "mapping": {
+    "version": "0.2",
+    "id": "formula-error-fails-closed",
+    "property_mappings": [
+      {
+        "id": "bad-formula",
+        "source": "/name",
+        "target": "/result",
+        "formula": {
+          "to_target": {
+            "expression": "source + 999"
+          }
+        }
+      }
+    ]
+  },
+  "direction": "to_target",
+  "source_data": {
+    "name": "Ada"
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": false,
+    "output": {},
+    "errors_count": 1,
+    "warnings_count": 0,
+    "log_statuses": ["formula_error"]
+  }
+}

@@ -1,0 +1,141 @@
+use cel_evaluator::{
+    evaluate_cel_expression_with_input, preview_cel_expression_with_input, SecurityLimits,
+    StandaloneEvalError, StandaloneExpressionInput,
+};
+use mapping_functions::codes::CodeSystemRegistry;
+use serde_json::{json, Value as JsonValue};
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
+fn input(
+    bindings: impl IntoIterator<Item = (&'static str, JsonValue)>,
+) -> StandaloneExpressionInput {
+    StandaloneExpressionInput::new(
+        bindings
+            .into_iter()
+            .map(|(name, value)| (name.to_string(), value))
+            .collect(),
+    )
+}
+
+fn codes() -> Arc<CodeSystemRegistry> {
+    Arc::new(CodeSystemRegistry::new())
+}
+
+#[test]
+fn evaluates_arbitrary_root_bindings() {
+    let result = evaluate_cel_expression_with_input(
+        r#"patient.name + " @ " + encounter.id"#,
+        input([
+            ("patient", json!({ "name": "Asha" })),
+            ("encounter", json!({ "id": "E-42" })),
+        ]),
+        &SecurityLimits::default(),
+        codes(),
+    )
+    .unwrap();
+
+    assert_eq!(result, json!("Asha @ E-42"));
+}
+
+#[test]
+fn free_function_evaluates_arbitrary_root_bindings() {
+    let result = evaluate_cel_expression_with_input(
+        "claim.total + payment.amount",
+        input([
+            ("claim", json!({ "total": 7 })),
+            ("payment", json!({ "amount": 5 })),
+        ]),
+        &SecurityLimits::default(),
+        codes(),
+    )
+    .unwrap();
+
+    assert_eq!(result, json!(12));
+}
+
+#[test]
+fn missing_aware_helpers_work_for_arbitrary_roots() {
+    assert_eq!(
+        evaluate_cel_expression_with_input(
+            "present(patient.middle_name)",
+            input([("patient", json!({ "given_name": "Asha" }))]),
+            &SecurityLimits::default(),
+            codes(),
+        )
+        .unwrap(),
+        json!(false)
+    );
+    assert_eq!(
+        evaluate_cel_expression_with_input(
+            r#"default(patient.middle_name, "N/A")"#,
+            input([("patient", json!({ "given_name": "Asha" }))]),
+            &SecurityLimits::default(),
+            codes(),
+        )
+        .unwrap(),
+        json!("N/A")
+    );
+}
+
+#[test]
+fn strict_access_for_arbitrary_root_missing_field_still_errors() {
+    let result = evaluate_cel_expression_with_input(
+        r#"patient.middle_name == "x""#,
+        input([("patient", json!({ "given_name": "Asha" }))]),
+        &SecurityLimits::default(),
+        codes(),
+    );
+
+    assert!(
+        result.is_err(),
+        "strict missing access should not receive a Missing sentinel: {result:?}"
+    );
+}
+
+#[test]
+fn preview_evaluates_arbitrary_root_bindings() {
+    let preview = preview_cel_expression_with_input(
+        r#"default(patient.middle_name, "N/A")"#,
+        input([("patient", json!({ "given_name": "Asha" }))]),
+        &SecurityLimits::default(),
+        codes(),
+    );
+
+    assert!(preview.is_ok(), "{:?}", preview.issues);
+    assert_eq!(preview.value, Some(json!("N/A")));
+}
+
+#[test]
+fn explicit_ctx_binding_is_available() {
+    let result = evaluate_cel_expression_with_input(
+        "ctx.timezone",
+        input([("ctx", json!({"timezone": "Asia/Bangkok"}))]),
+        &SecurityLimits::default(),
+        codes(),
+    )
+    .unwrap();
+
+    assert_eq!(result, json!("Asia/Bangkok"));
+}
+
+#[test]
+fn invalid_binding_names_are_rejected_for_evaluate_and_preview() {
+    let mut root_bindings = BTreeMap::new();
+    root_bindings.insert("bad-name".to_string(), json!({}));
+    let input = StandaloneExpressionInput::new(root_bindings);
+
+    let result =
+        evaluate_cel_expression_with_input("1", input.clone(), &SecurityLimits::default(), codes());
+    assert!(matches!(
+        result,
+        Err(StandaloneEvalError::InvalidBindingName { name, .. }) if name == "bad-name"
+    ));
+
+    let preview =
+        preview_cel_expression_with_input("1", input, &SecurityLimits::default(), codes());
+    assert!(!preview.is_ok());
+    assert!(preview.issues[0]
+        .message
+        .contains("invalid root binding name `bad-name`"));
+}

@@ -1,0 +1,507 @@
+# ISO 4217 currency codes. Source key = code; id = canonical uppercase code.
+# Aliases include the canonical id itself so case-insensitive lookups succeed.
+# Generated from ISO 4217 (2024-12). Regenerate via scripts/gen_iso4217.py if updated.
+AED:
+  id: AED
+  aliases: []
+AFN:
+  id: AFN
+  aliases: []
+ALL:
+  id: ALL
+  aliases: []
+AMD:
+  id: AMD
+  aliases: []
+ANG:
+  id: ANG
+  aliases: []
+AOA:
+  id: AOA
+  aliases: []
+ARS:
+  id: ARS
+  aliases: []
+AUD:
+  id: AUD
+  aliases: []
+AWG:
+  id: AWG
+  aliases: []
+AZN:
+  id: AZN
+  aliases: []
+BAM:
+  id: BAM
+  aliases: []
+BBD:
+  id: BBD
+  aliases: []
+BDT:
+  id: BDT
+  aliases: []
+BGN:
+  id: BGN
+  aliases: []
+BHD:
+  id: BHD
+  aliases: []
+BIF:
+  id: BIF
+  aliases: []
+BMD:
+  id: BMD
+  aliases: []
+BND:
+  id: BND
+  aliases: []
+BOB:
+  id: BOB
+  aliases: []
+BOV:
+  id: BOV
+  aliases: []
+BRL:
+  id: BRL
+  aliases: []
+BSD:
+  id: BSD
+  aliases: []
+BTN:
+  id: BTN
+  aliases: []
+BWP:
+  id: BWP
+  aliases: []
+BYN:
+  id: BYN
+  aliases: []
+BZD:
+  id: BZD
+  aliases: []
+CAD:
+  id: CAD
+  aliases: []
+CDF:
+  id: CDF
+  aliases: []
+CHE:
+  id: CHE
+  aliases: []
+CHF:
+  id: CHF
+  aliases: []
+CHW:
+  id: CHW
+  aliases: []
+CLF:
+  id: CLF
+  aliases: []
+CLP:
+  id: CLP
+  aliases: []
+CNY:
+  id: CNY
+  aliases: []
+COP:
+  id: COP
+  aliases: []
+COU:
+  id: COU
+  aliases: []
+CRC:
+  id: CRC
+  aliases: []
+CUP:
+  id: CUP
+  aliases: []
+CVE:
+  id: CVE
+  aliases: []
+CZK:
+  id: CZK
+  aliases: []
+DJF:
+  id: DJF
+  aliases: []
+DKK:
+  id: DKK
+  aliases: []
+DOP:
+  id: DOP
+  aliases: []
+DZD:
+  id: DZD
+  aliases: []
+EGP:
+  id: EGP
+  aliases: []
+ERN:
+  id: ERN
+  aliases: []
+ETB:
+  id: ETB
+  aliases: []
+EUR:
+  id: EUR
+  aliases: []
+FJD:
+  id: FJD
+  aliases: []
+FKP:
+  id: FKP
+  aliases: []
+GBP:
+  id: GBP
+  aliases: []
+GEL:
+  id: GEL
+  aliases: []
+GHS:
+  id: GHS
+  aliases: []
+GIP:
+  id: GIP
+  aliases: []
+GMD:
+  id: GMD
+  aliases: []
+GNF:
+  id: GNF
+  aliases: []
+GTQ:
+  id: GTQ
+  aliases: []
+GYD:
+  id: GYD
+  aliases: []
+HKD:
+  id: HKD
+  aliases: []
+HNL:
+  id: HNL
+  aliases: []
+HTG:
+  id: HTG
+  aliases: []
+HUF:
+  id: HUF
+  aliases: []
+IDR:
+  id: IDR
+  aliases: []
+ILS:
+  id: ILS
+  aliases: []
+INR:
+  id: INR
+  aliases: []
+IQD:
+  id: IQD
+  aliases: []
+IRR:
+  id: IRR
+  aliases: []
+ISK:
+  id: ISK
+  aliases: []
+JMD:
+  id: JMD
+  aliases: []
+JOD:
+  id: JOD
+  aliases: []
+JPY:
+  id: JPY
+  aliases: []
+KES:
+  id: KES
+  aliases: []
+KGS:
+  id: KGS
+  aliases: []
+KHR:
+  id: KHR
+  aliases: []
+KMF:
+  id: KMF
+  aliases: []
+KPW:
+  id: KPW
+  aliases: []
+KRW:
+  id: KRW
+  aliases: []
+KWD:
+  id: KWD
+  aliases: []
+KYD:
+  id: KYD
+  aliases: []
+KZT:
+  id: KZT
+  aliases: []
+LAK:
+  id: LAK
+  aliases: []
+LBP:
+  id: LBP
+  aliases: []
+LKR:
+  id: LKR
+  aliases: []
+LRD:
+  id: LRD
+  aliases: []
+LSL:
+  id: LSL
+  aliases: []
+LYD:
+  id: LYD
+  aliases: []
+MAD:
+  id: MAD
+  aliases: []
+MDL:
+  id: MDL
+  aliases: []
+MGA:
+  id: MGA
+  aliases: []
+MKD:
+  id: MKD
+  aliases: []
+MMK:
+  id: MMK
+  aliases: []
+MNT:
+  id: MNT
+  aliases: []
+MOP:
+  id: MOP
+  aliases: []
+MRU:
+  id: MRU
+  aliases: []
+MUR:
+  id: MUR
+  aliases: []
+MVR:
+  id: MVR
+  aliases: []
+MWK:
+  id: MWK
+  aliases: []
+MXN:
+  id: MXN
+  aliases: []
+MXV:
+  id: MXV
+  aliases: []
+MYR:
+  id: MYR
+  aliases: []
+MZN:
+  id: MZN
+  aliases: []
+NAD:
+  id: NAD
+  aliases: []
+NGN:
+  id: NGN
+  aliases: []
+NIO:
+  id: NIO
+  aliases: []
+NOK:
+  id: NOK
+  aliases: []
+NPR:
+  id: NPR
+  aliases: []
+NZD:
+  id: NZD
+  aliases: []
+OMR:
+  id: OMR
+  aliases: []
+PAB:
+  id: PAB
+  aliases: []
+PEN:
+  id: PEN
+  aliases: []
+PGK:
+  id: PGK
+  aliases: []
+PHP:
+  id: PHP
+  aliases: []
+PKR:
+  id: PKR
+  aliases: []
+PLN:
+  id: PLN
+  aliases: []
+PYG:
+  id: PYG
+  aliases: []
+QAR:
+  id: QAR
+  aliases: []
+RON:
+  id: RON
+  aliases: []
+RSD:
+  id: RSD
+  aliases: []
+RUB:
+  id: RUB
+  aliases: []
+RWF:
+  id: RWF
+  aliases: []
+SAR:
+  id: SAR
+  aliases: []
+SBD:
+  id: SBD
+  aliases: []
+SCR:
+  id: SCR
+  aliases: []
+SDG:
+  id: SDG
+  aliases: []
+SEK:
+  id: SEK
+  aliases: []
+SGD:
+  id: SGD
+  aliases: []
+SHP:
+  id: SHP
+  aliases: []
+SLE:
+  id: SLE
+  aliases: []
+SOS:
+  id: SOS
+  aliases: []
+SRD:
+  id: SRD
+  aliases: []
+SSP:
+  id: SSP
+  aliases: []
+STN:
+  id: STN
+  aliases: []
+SVC:
+  id: SVC
+  aliases: []
+SYP:
+  id: SYP
+  aliases: []
+SZL:
+  id: SZL
+  aliases: []
+THB:
+  id: THB
+  aliases: []
+TJS:
+  id: TJS
+  aliases: []
+TMT:
+  id: TMT
+  aliases: []
+TND:
+  id: TND
+  aliases: []
+TOP:
+  id: TOP
+  aliases: []
+TRY:
+  id: TRY
+  aliases: []
+TTD:
+  id: TTD
+  aliases: []
+TWD:
+  id: TWD
+  aliases: []
+TZS:
+  id: TZS
+  aliases: []
+UAH:
+  id: UAH
+  aliases: []
+UGX:
+  id: UGX
+  aliases: []
+USD:
+  id: USD
+  aliases: []
+USN:
+  id: USN
+  aliases: []
+UYI:
+  id: UYI
+  aliases: []
+UYU:
+  id: UYU
+  aliases: []
+UYW:
+  id: UYW
+  aliases: []
+UZS:
+  id: UZS
+  aliases: []
+VED:
+  id: VED
+  aliases: []
+VES:
+  id: VES
+  aliases: []
+VND:
+  id: VND
+  aliases: []
+VUV:
+  id: VUV
+  aliases: []
+WST:
+  id: WST
+  aliases: []
+XAF:
+  id: XAF
+  aliases: []
+XCD:
+  id: XCD
+  aliases: []
+XDR:
+  id: XDR
+  aliases: []
+XOF:
+  id: XOF
+  aliases: []
+XPF:
+  id: XPF
+  aliases: []
+XSU:
+  id: XSU
+  aliases: []
+XUA:
+  id: XUA
+  aliases: []
+YER:
+  id: YER
+  aliases: []
+ZAR:
+  id: ZAR
+  aliases: []
+ZMW:
+  id: ZMW
+  aliases: []
+ZWG:
+  id: ZWG
+  aliases: []

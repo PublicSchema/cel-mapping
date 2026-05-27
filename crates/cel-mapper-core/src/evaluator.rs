@@ -16,36 +16,11 @@ use crate::paths::{
     collect_dotted_paths_with_roots, collect_missing_aware_injection_paths, filter_paths_by_roots,
 };
 use cel::{Context, ExecutionError, Program, Value};
-use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-/// Root bindings for standalone CEL expression evaluation.
-///
-/// Each entry is exposed as a top-level CEL variable. For example, a binding named
-/// `patient` lets expressions read `patient.name` directly.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct StandaloneExpressionInput {
-    #[serde(default)]
-    pub root_bindings: BTreeMap<String, JsonValue>,
-}
-
-impl StandaloneExpressionInput {
-    pub fn new(root_bindings: BTreeMap<String, JsonValue>) -> Self {
-        Self { root_bindings }
-    }
-
-    pub fn from_source_context(source: JsonValue, context: JsonValue) -> Self {
-        let mut root_bindings = BTreeMap::new();
-        root_bindings.insert("source".to_string(), source.clone());
-        root_bindings.insert("root".to_string(), source);
-        root_bindings.insert("ctx".to_string(), context);
-        root_bindings.insert("vars".to_string(), JsonValue::Object(Map::new()));
-        root_bindings.insert("item".to_string(), JsonValue::Null);
-        Self { root_bindings }
-    }
-}
+pub use cel_evaluator::StandaloneExpressionInput;
 
 pub fn evaluate_mapping(
     mapping: &CompiledMapping,

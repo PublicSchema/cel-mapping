@@ -1,12 +1,20 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/mapping-functions",
+    "crates/mapping-functions-cel",
+    "crates/cel-evaluator",
+    "crates/publicschema-mapping",
     "crates/cel-mapper-core",
     "crates/cel-mapper-wasm",
     "crates/cel-mapper-python",
 ]
 # PyO3 links libpython; keep it out of the default graph so `cargo test` works without Python dev libs.
 default-members = [
+    "crates/mapping-functions",
+    "crates/mapping-functions-cel",
+    "crates/cel-evaluator",
+    "crates/publicschema-mapping",
     "crates/cel-mapper-core",
     "crates/cel-mapper-wasm",
 ]
@@ -14,5 +22,6 @@ default-members = [
 [workspace.package]
 version = "0.1.1"
 edition = "2021"
+rust-version = "1.83"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/PublicSchema/cel-mapping"

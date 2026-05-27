@@ -1,0 +1,35 @@
+{
+  "name": "wrong-direction-no-identity",
+  "mapping": {
+    "version": "0.2",
+    "id": "wrong-direction-no-identity",
+    "property_mappings": [
+      {
+        "id": "field-a",
+        "source": "/a",
+        "target": "/b",
+        "formula": {
+          "to_target": {
+            "expression": "source + 1"
+          }
+        }
+      }
+    ]
+  },
+  "direction": "from_target",
+  "source_data": {
+    "b": 2
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": false,
+    "output": {},
+    "errors_count": 1,
+    "warnings_count": 0,
+    "log_statuses": ["formula_error"]
+  }
+}

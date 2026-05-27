@@ -1,0 +1,30 @@
+{
+  "name": "missing-optional-omits",
+  "mapping": {
+    "version": "0.2",
+    "id": "missing-optional-omits",
+    "property_mappings": [
+      {
+        "id": "optional-field",
+        "source": "/middle_name",
+        "target": "/middle"
+      }
+    ]
+  },
+  "direction": "to_target",
+  "source_data": {
+    "given": "Ada"
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": true,
+    "output": {},
+    "errors_count": 0,
+    "warnings_count": 0,
+    "log_statuses": ["defaulted"]
+  }
+}

@@ -5,22 +5,19 @@ use super::helpers::{
     present_value, require_present, value_as_str,
 };
 use crate::budget;
-use crate::code_system::CodeSystemRegistry;
 use crate::eval_ctx::{eval_ctx_get, push_warning};
 use crate::missing::{is_missing, missing_value};
 use crate::output::{cel_to_json, deep_merge_json, merge_json_objects};
+use crate::{FunctionRegistry, FunctionRequestContext, HelperArity, HelperMetadata};
 use cel::extractors::Arguments;
 use cel::{Context, ExecutionError, Value};
-use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, TimeZone};
-use chrono_tz::Tz;
+use chrono::{Datelike, NaiveDate};
 use regex::Regex;
 use serde_json::{Map, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::str::FromStr;
 use std::sync::Arc;
-use unicode_normalization::UnicodeNormalization;
 
 fn err_fn(name: &str, m: impl ToString) -> ExecutionError {
     ExecutionError::function_error(name, m)
@@ -40,17 +37,16 @@ fn str_from(v: &Value) -> Result<String, ExecutionError> {
     value_as_str(v).map_err(|e| err_fn("str", e))
 }
 
-fn icuish_to_chrono(pat: &str) -> String {
-    pat.replace("XXX", "%:z")
-        .replace("yyyy", "%Y")
-        .replace("MM", "%m")
-        .replace("dd", "%d")
-        .replace("HH", "%H")
-        .replace("mm", "%M")
-        .replace("ss", "%S")
+pub fn register_mapping_functions(
+    ctx: &mut Context,
+    registry: FunctionRegistry,
+    request: FunctionRequestContext,
+) {
+    crate::eval_ctx::set_eval_ctx(request);
+    register_stdlib(ctx, Arc::new(registry));
 }
 
-pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
+pub fn register_stdlib(ctx: &mut Context, codes: Arc<FunctionRegistry>) {
     // --- 7.1 presence ---
     ctx.add_function(
         "present",
@@ -307,9 +303,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("text_trim", 1, args.len()));
             }
-            Ok(Value::String(Arc::new(
-                str_from(&args[0])?.trim().to_string(),
-            )))
+            Ok(Value::String(Arc::new(mapping_functions::text::trim(
+                &str_from(&args[0])?,
+            ))))
         },
     );
     ctx.add_function(
@@ -319,7 +315,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                 return Err(arity_error("text_lower", 1, args.len()));
             }
             Ok(Value::String(Arc::new(
-                str_from(&args[0])?.to_ascii_lowercase(),
+                mapping_functions::text::lower_ascii(&str_from(&args[0])?),
             )))
         },
     );
@@ -330,7 +326,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                 return Err(arity_error("text_upper", 1, args.len()));
             }
             Ok(Value::String(Arc::new(
-                str_from(&args[0])?.to_ascii_uppercase(),
+                mapping_functions::text::upper_ascii(&str_from(&args[0])?),
             )))
         },
     );
@@ -340,19 +336,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("text_title", 1, args.len()));
             }
-            let s = str_from(&args[0])?;
-            let t: String = s
-                .split_whitespace()
-                .map(|w| {
-                    let mut c = w.chars();
-                    match c.next() {
-                        None => String::new(),
-                        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
-            Ok(Value::String(Arc::new(t)))
+            Ok(Value::String(Arc::new(
+                mapping_functions::text::title_simple(&str_from(&args[0])?),
+            )))
         },
     );
     ctx.add_function(
@@ -361,9 +347,8 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("text_normalize_space", 1, args.len()));
             }
-            let s = str_from(&args[0])?;
             Ok(Value::String(Arc::new(
-                s.split_whitespace().collect::<Vec<_>>().join(" "),
+                mapping_functions::text::normalize_space(&str_from(&args[0])?),
             )))
         },
     );
@@ -373,12 +358,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("text_remove_accents", 1, args.len()));
             }
-            let s = str_from(&args[0])?;
-            let d: String = s
-                .nfd()
-                .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
-                .collect();
-            Ok(Value::String(Arc::new(d)))
+            Ok(Value::String(Arc::new(
+                mapping_functions::text::remove_accents(&str_from(&args[0])?),
+            )))
         },
     );
     ctx.add_function(
@@ -387,16 +369,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("text_slug", 1, args.len()));
             }
-            let s = str_from(&args[0])?.to_ascii_lowercase();
-            let slug: String = s
-                .chars()
-                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-                .collect::<String>()
-                .split('-')
-                .filter(|p| !p.is_empty())
-                .collect::<Vec<_>>()
-                .join("-");
-            Ok(Value::String(Arc::new(slug)))
+            Ok(Value::String(Arc::new(mapping_functions::text::slug(
+                &str_from(&args[0])?,
+            ))))
         },
     );
     ctx.add_function(
@@ -422,8 +397,8 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             let s = str_from(&args[0])?;
             let p = str_from(&args[1])?;
             let r = str_from(&args[2])?;
-            let re = Regex::new(&p).map_err(|e| err_fn("text_regex_replace", e))?;
-            let out = re.replace_all(&s, r.as_str()).to_string();
+            let out = mapping_functions::text::regex_replace(&s, &p, &r)
+                .map_err(|e| err_fn("text_regex_replace", e.message))?;
             budget::enforce_max_string_bytes(out.len())?;
             Ok(Value::String(Arc::new(out)))
         },
@@ -578,7 +553,6 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             }
             let s = str_from(&args[0])?;
             let p = str_from(&args[1])?;
-            let re = Regex::new(&p).map_err(|e| err_fn("text_regex_extract", e))?;
             let g = match &args[2] {
                 Value::Int(i) => usize::try_from((*i).max(0)).unwrap_or(0),
                 Value::UInt(u) => *u as usize,
@@ -589,16 +563,10 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                     ))
                 }
             };
-            match re.captures(&s) {
-                None => Ok(Value::String(Arc::new(String::new()))),
-                Some(caps) => {
-                    let extracted = caps
-                        .get(g)
-                        .map(|m| m.as_str().to_string())
-                        .unwrap_or_default();
-                    Ok(Value::String(Arc::new(extracted)))
-                }
-            }
+            let extracted = mapping_functions::text::regex_extract(&s, &p, g)
+                .map_err(|e| err_fn("text_regex_extract", e.message))?
+                .unwrap_or_default();
+            Ok(Value::String(Arc::new(extracted)))
         },
     );
 
@@ -694,9 +662,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             } else {
                 str_from(&fmt)?
             };
-            let ch = icuish_to_chrono(&pat);
-            let nd = NaiveDate::parse_from_str(&s, &ch).map_err(|e| err_fn("date_parse", e))?;
-            Ok(Value::String(Arc::new(nd.format("%Y-%m-%d").to_string())))
+            let out = mapping_functions::date::parse_date(&s, Some(&pat))
+                .map_err(|e| err_fn("date_parse", e.message))?;
+            Ok(Value::String(Arc::new(out)))
         },
     );
     ctx.add_function(
@@ -713,50 +681,21 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                 }
             };
             let s = str_from(&v)?;
-            if !matches!(fmt, Value::Null) && !is_missing(&fmt) {
-                let ch = icuish_to_chrono(&str_from(&fmt)?);
-                if let Ok(dt) = chrono::DateTime::parse_from_str(&s, &ch) {
-                    return Ok(Value::String(Arc::new(dt.to_rfc3339())));
-                }
-                let tzs = eval_ctx_get(&["timezone"])
-                    .and_then(|x| x.as_str().map(|s| s.to_string()))
-                    .ok_or_else(|| {
-                        err_fn(
-                            "date_parse_datetime",
-                            "ctx.timezone required for offset-less datetime",
-                        )
-                    })?;
-                let tz = Tz::from_str(&tzs)
-                    .map_err(|_| err_fn("date_parse_datetime", "invalid ctx.timezone"))?;
-                let ndt = NaiveDateTime::parse_from_str(&s, &ch)
-                    .map_err(|e| err_fn("date_parse_datetime", e))?;
-                let dt = tz
-                    .from_local_datetime(&ndt)
-                    .single()
-                    .ok_or_else(|| err_fn("date_parse_datetime", "ambiguous local"))?;
-                return Ok(Value::String(Arc::new(dt.to_rfc3339())));
-            }
-            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
-                return Ok(Value::String(Arc::new(dt.to_rfc3339())));
-            }
-            let tzs = eval_ctx_get(&["timezone"])
+            let pattern = if matches!(fmt, Value::Null) || is_missing(&fmt) {
+                None
+            } else {
+                Some(str_from(&fmt)?)
+            };
+            let timezone = eval_ctx_get(&["timezone"])
                 .and_then(|x| x.as_str().map(|s| s.to_string()))
-                .ok_or_else(|| {
-                    err_fn(
-                        "date_parse_datetime",
-                        "ctx.timezone required for offset-less datetime",
-                    )
-                })?;
-            let tz = Tz::from_str(&tzs)
-                .map_err(|_| err_fn("date_parse_datetime", "invalid ctx.timezone"))?;
-            let ndt = NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S")
-                .or_else(|_| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S"))
-                .map_err(|e| err_fn("date_parse_datetime", e))?;
-            let dt = tz
-                .from_local_datetime(&ndt)
-                .single()
-                .ok_or_else(|| err_fn("date_parse_datetime", "ambiguous"))?;
-            Ok(Value::String(Arc::new(dt.to_rfc3339())))
+                .or(None);
+            let out = mapping_functions::date::parse_datetime(
+                &s,
+                pattern.as_deref(),
+                timezone.as_deref(),
+            )
+            .map_err(|e| err_fn("date_parse_datetime", e.message))?;
+            Ok(Value::String(Arc::new(out)))
         },
     );
     ctx.add_function(
@@ -767,13 +706,18 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             }
             let s = str_from(&args[0])?;
             let pat = str_from(&args[1])?;
-            let ch = icuish_to_chrono(&pat);
-            if let Ok(nd) = NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
-                return Ok(Value::String(Arc::new(nd.format(&ch).to_string())));
+            let out = mapping_functions::date::format_date_or_datetime(&s, &pat)
+                .map_err(|e| err_fn("date_format", e.message))?;
+            Ok(Value::String(Arc::new(out)))
+        },
+    );
+    ctx.add_function(
+        "date_is_valid",
+        |Arguments(args): Arguments| -> Result<bool, ExecutionError> {
+            if args.len() != 1 {
+                return Err(arity_error("date_is_valid", 1, args.len()));
             }
-            let dt =
-                chrono::DateTime::parse_from_rfc3339(&s).map_err(|e| err_fn("date_format", e))?;
-            Ok(Value::String(Arc::new(dt.format(&ch).to_string())))
+            Ok(mapping_functions::date::parse_date(&str_from(&args[0])?, None).is_ok())
         },
     );
     ctx.add_function(
@@ -782,10 +726,11 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if !args.is_empty() {
                 return Err(arity_error("date_today", 0, args.len()));
             }
-            let t = eval_ctx_get(&["today"])
-                .and_then(|x| x.as_str().map(|s| s.to_string()))
-                .ok_or_else(|| err_fn("date_today", "ctx.today not set"))?;
-            Ok(Value::String(Arc::new(t)))
+            let t = eval_ctx_get(&["today"]).and_then(|x| x.as_str().map(|s| s.to_string()));
+            Ok(Value::String(Arc::new(
+                mapping_functions::date::today(t.as_deref())
+                    .map_err(|e| err_fn("date_today", e.message))?,
+            )))
         },
     );
     ctx.add_function(
@@ -794,18 +739,8 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 2 {
                 return Err(arity_error("date_age_on", 2, args.len()));
             }
-            let b = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_age_on", e))?;
-            let r = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_age_on", e))?;
-            let age = r.year()
-                - b.year()
-                - if r.month() < b.month() || (r.month() == b.month() && r.day() < b.day()) {
-                    1
-                } else {
-                    0
-                };
-            Ok(age as i64)
+            mapping_functions::date::age_on(&str_from(&args[0])?, &str_from(&args[1])?)
+                .map_err(|e| err_fn("date_age_on", e.message))
         },
     );
     ctx.add_function(
@@ -814,7 +749,8 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 2 {
                 return Err(arity_error("date_years_between", 2, args.len()));
             }
-            years_between_dates(&args[0], &args[1])
+            mapping_functions::date::years_between(&str_from(&args[0])?, &str_from(&args[1])?)
+                .map_err(|e| err_fn("date_years_between", e.message))
         },
     );
     ctx.add_function(
@@ -823,11 +759,8 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 2 {
                 return Err(arity_error("date_days_between", 2, args.len()));
             }
-            let da = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_days_between", e))?;
-            let db = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_days_between", e))?;
-            Ok(db.signed_duration_since(da).num_days())
+            mapping_functions::date::days_between(&str_from(&args[0])?, &str_from(&args[1])?)
+                .map_err(|e| err_fn("date_days_between", e.message))
         },
     );
     ctx.add_function(
@@ -836,8 +769,6 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 2 {
                 return Err(arity_error("date_add_days", 2, args.len()));
             }
-            let nd = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_add_days", e))?;
             let days = match &args[1] {
                 Value::Int(i) => *i,
                 Value::UInt(u) => *u as i64,
@@ -848,10 +779,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                     ))
                 }
             };
-            let out = nd
-                .checked_add_signed(Duration::days(days))
-                .ok_or_else(|| err_fn("date_add_days", "overflow"))?;
-            Ok(Value::String(Arc::new(out.format("%Y-%m-%d").to_string())))
+            let out = mapping_functions::date::add_days(&str_from(&args[0])?, days)
+                .map_err(|e| err_fn("date_add_days", e.message))?;
+            Ok(Value::String(Arc::new(out)))
         },
     );
     ctx.add_function(
@@ -860,8 +790,6 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 2 {
                 return Err(arity_error("date_add_months", 2, args.len()));
             }
-            let nd = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_add_months", e))?;
             let months = match &args[1] {
                 Value::Int(i) => *i,
                 Value::UInt(u) => *u as i64,
@@ -872,9 +800,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                     ))
                 }
             };
-            let out =
-                add_months_safe(nd, months).ok_or_else(|| err_fn("date_add_months", "overflow"))?;
-            Ok(Value::String(Arc::new(out.format("%Y-%m-%d").to_string())))
+            let out = mapping_functions::date::add_months(&str_from(&args[0])?, months)
+                .map_err(|e| err_fn("date_add_months", e.message))?;
+            Ok(Value::String(Arc::new(out)))
         },
     );
     ctx.add_function(
@@ -883,10 +811,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("date_start_of_month", 1, args.len()));
             }
-            let nd = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_start_of_month", e))?;
-            let out = nd.with_day(1).unwrap();
-            Ok(Value::String(Arc::new(out.format("%Y-%m-%d").to_string())))
+            let out = mapping_functions::date::start_of_month(&str_from(&args[0])?)
+                .map_err(|e| err_fn("date_start_of_month", e.message))?;
+            Ok(Value::String(Arc::new(out)))
         },
     );
     ctx.add_function(
@@ -895,16 +822,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("date_end_of_month", 1, args.len()));
             }
-            let nd = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_end_of_month", e))?;
-            let (ny, nm) = if nd.month() == 12 {
-                (nd.year() + 1, 1)
-            } else {
-                (nd.year(), nd.month() + 1)
-            };
-            let first_next = NaiveDate::from_ymd_opt(ny, nm, 1).unwrap();
-            let last = first_next.pred_opt().unwrap();
-            Ok(Value::String(Arc::new(last.format("%Y-%m-%d").to_string())))
+            let out = mapping_functions::date::end_of_month(&str_from(&args[0])?)
+                .map_err(|e| err_fn("date_end_of_month", e.message))?;
+            Ok(Value::String(Arc::new(out)))
         },
     );
     ctx.add_function(
@@ -939,15 +859,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 2 {
                 return Err(arity_error("date_min", 2, args.len()));
             }
-            let da = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_min", e))?;
-            let db = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_min", e))?;
-            Ok(Value::String(Arc::new(if da <= db {
-                da.format("%Y-%m-%d").to_string()
-            } else {
-                db.format("%Y-%m-%d").to_string()
-            })))
+            let out = mapping_functions::date::min_date(&str_from(&args[0])?, &str_from(&args[1])?)
+                .map_err(|e| err_fn("date_min", e.message))?;
+            Ok(Value::String(Arc::new(out)))
         },
     );
     ctx.add_function(
@@ -956,15 +870,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 2 {
                 return Err(arity_error("date_max", 2, args.len()));
             }
-            let da = NaiveDate::parse_from_str(&str_from(&args[0])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_max", e))?;
-            let db = NaiveDate::parse_from_str(&str_from(&args[1])?, "%Y-%m-%d")
-                .map_err(|e| err_fn("date_max", e))?;
-            Ok(Value::String(Arc::new(if da >= db {
-                da.format("%Y-%m-%d").to_string()
-            } else {
-                db.format("%Y-%m-%d").to_string()
-            })))
+            let out = mapping_functions::date::max_date(&str_from(&args[0])?, &str_from(&args[1])?)
+                .map_err(|e| err_fn("date_max", e.message))?;
+            Ok(Value::String(Arc::new(out)))
         },
     );
 
@@ -1614,7 +1522,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
         "code_normalize",
         move |Arguments(args): Arguments| -> Result<Value, ExecutionError> {
             match args.len() {
-                1 => Ok(Value::String(Arc::new(CodeSystemRegistry::normalize_code(
+                1 => Ok(Value::String(Arc::new(FunctionRegistry::normalize_code(
                     &str_from(&args[0])?,
                 )))),
                 2 => {
@@ -1681,9 +1589,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if a != "sha256" {
                 return Err(err_fn("id_hash", "only sha256 supported"));
             }
-            let mut h = Sha256::new();
-            h.update(s.as_bytes());
-            Ok(Value::String(Arc::new(hex::encode(h.finalize()))))
+            Ok(Value::String(Arc::new(
+                mapping_functions::ids::stable_hash_sha256(&s, None),
+            )))
         },
     );
     ctx.add_function(
@@ -1693,16 +1601,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                 return Err(arity_error("id_slug", 2, args.len()));
             }
             let p = str_from(&args[0])?;
-            let s = str_from(&args[1])?.to_ascii_lowercase();
-            let slug: String = s
-                .chars()
-                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-                .collect::<String>()
-                .split('-')
-                .filter(|x| !x.is_empty())
-                .collect::<Vec<_>>()
-                .join("-");
-            Ok(Value::String(Arc::new(format!("{p}_{slug}"))))
+            Ok(Value::String(Arc::new(
+                mapping_functions::ids::prefixed_slug(&p, &str_from(&args[1])?),
+            )))
         },
     );
     ctx.add_function(
@@ -1711,12 +1612,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("id_clean", 1, args.len()));
             }
-            let s = str_from(&args[0])?;
-            let out: String = s
-                .chars()
-                .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
-                .collect();
-            Ok(Value::String(Arc::new(out)))
+            Ok(Value::String(Arc::new(mapping_functions::ids::clean_id(
+                &str_from(&args[0])?,
+            ))))
         },
     );
     ctx.add_function(
@@ -1801,7 +1699,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             let Ok(s) = str_from(&args[0]) else {
                 return Ok(false);
             };
-            Ok(crate::functions::phone::is_valid(&s, &args[1]))
+            Ok(crate::phone::is_valid(&s, &args[1]))
         },
     );
     ctx.add_function(
@@ -1811,7 +1709,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                 return Err(arity_error("phone_country_code", 2, args.len()));
             }
             let s = str_from(&args[0])?;
-            match crate::functions::phone::country_calling_code(&s, &args[1]) {
+            match crate::phone::country_calling_code(&s, &args[1]) {
                 Ok(cc) => Ok(Value::String(Arc::new(cc))),
                 Err(m) => Err(err_fn("phone_country_code", m)),
             }
@@ -1841,7 +1739,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                 return Err(arity_error("email_normalize", 1, args.len()));
             }
             Ok(Value::String(Arc::new(
-                str_from(&args[0])?.trim().to_ascii_lowercase(),
+                mapping_functions::email::normalize_email(&str_from(&args[0])?),
             )))
         },
     );
@@ -1854,7 +1752,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             let Ok(s) = str_from(&args[0]) else {
                 return Ok(false);
             };
-            Ok(s.contains('@') && !s.starts_with('@') && !s.ends_with('@'))
+            Ok(mapping_functions::email::is_valid_email(&s))
         },
     );
     ctx.add_function(
@@ -1863,9 +1761,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("email_domain", 1, args.len()));
             }
-            let s = str_from(&args[0])?;
-            let d = s.split('@').nth(1).unwrap_or("").to_string();
-            Ok(Value::String(Arc::new(d)))
+            Ok(Value::String(Arc::new(
+                mapping_functions::email::email_domain(&str_from(&args[0])?).unwrap_or_default(),
+            )))
         },
     );
 
@@ -1977,7 +1875,7 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if s.len() == 2 {
                 Ok(Value::String(Arc::new(s)))
             } else {
-                Ok(Value::String(Arc::new(CodeSystemRegistry::normalize_code(
+                Ok(Value::String(Arc::new(FunctionRegistry::normalize_code(
                     &s,
                 ))))
             }
@@ -2155,22 +2053,22 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
                 }
             }
             .max(0) as usize;
-            if s.len() <= n {
-                return Ok(Value::String(Arc::new("*".repeat(s.len()))));
-            }
-            let masked = "*".repeat(s.len().saturating_sub(n)) + &s[s.len() - n..];
-            Ok(Value::String(Arc::new(masked)))
+            Ok(Value::String(Arc::new(mapping_functions::redaction::mask(
+                &s, n,
+            ))))
         },
     );
     ctx.add_function(
         "privacy_sha256",
         |v: Value, salt: Value| -> Result<Value, ExecutionError> {
-            let mut h = Sha256::new();
-            if !matches!(salt, Value::Null) && !is_missing(&salt) {
-                h.update(str_from(&salt)?.as_bytes());
-            }
-            h.update(str_from(&v)?.as_bytes());
-            Ok(Value::String(Arc::new(hex::encode(h.finalize()))))
+            let salt = if !matches!(salt, Value::Null) && !is_missing(&salt) {
+                Some(str_from(&salt)?)
+            } else {
+                None
+            };
+            Ok(Value::String(Arc::new(
+                mapping_functions::ids::stable_hash_sha256(&str_from(&v)?, salt.as_deref()),
+            )))
         },
     );
     ctx.add_function(
@@ -2179,7 +2077,9 @@ pub fn register_stdlib(ctx: &mut Context, codes: Arc<CodeSystemRegistry>) {
             if args.len() != 1 {
                 return Err(arity_error("privacy_redact", 1, args.len()));
             }
-            Ok(Value::String(Arc::new("[REDACTED]".into())))
+            Ok(Value::String(Arc::new(
+                mapping_functions::redaction::redact(),
+            )))
         },
     );
 }
@@ -2197,23 +2097,6 @@ fn date_age_on_impl(a: Value, b: Value) -> Result<i64, ExecutionError> {
             0
         };
     Ok(age as i64)
-}
-
-fn add_months_safe(d: NaiveDate, months: i64) -> Option<NaiveDate> {
-    let total = d.month0() as i64 + months;
-    let year = d.year() as i64 + total.div_euclid(12);
-    let month0 = total.rem_euclid(12) as u32;
-    let day = d.day().min(last_day_of_month(year as i32, month0 + 1));
-    NaiveDate::from_ymd_opt(year as i32, month0 + 1, day)
-}
-
-fn last_day_of_month(y: i32, m: u32) -> u32 {
-    (1..=31)
-        .rev()
-        .filter_map(|d| NaiveDate::from_ymd_opt(y, m, d))
-        .next()
-        .map(|d| d.day())
-        .unwrap_or(28)
 }
 
 fn num_f64(v: &Value) -> Result<f64, ExecutionError> {
@@ -2297,19 +2180,6 @@ fn map_lookup_value(obj: &Value, path: &str) -> Option<Value> {
     Some(cur.clone())
 }
 
-fn years_between_dates(a: &Value, b: &Value) -> Result<i64, ExecutionError> {
-    let da = NaiveDate::parse_from_str(&str_from(a)?, "%Y-%m-%d")
-        .map_err(|e| err_fn("date_years_between", e))?;
-    let db = NaiveDate::parse_from_str(&str_from(b)?, "%Y-%m-%d")
-        .map_err(|e| err_fn("date_years_between", e))?;
-    let (start, end) = if da <= db { (da, db) } else { (db, da) };
-    let mut y = end.year() - start.year();
-    if (end.month(), end.day()) < (start.month(), start.day()) {
-        y -= 1;
-    }
-    Ok(y as i64)
-}
-
 fn set_json_path(
     root: &mut JsonValue,
     path: &str,
@@ -2353,8 +2223,176 @@ fn sort_json(v: JsonValue) -> JsonValue {
 
 fn phone_normalize_impl(v: Value, country: Value) -> Result<Value, ExecutionError> {
     let s = str_from(&v)?;
-    match crate::functions::phone::normalize_e164(&s, &country) {
+    match crate::phone::normalize_e164(&s, &country) {
         Ok(out) => Ok(Value::String(Arc::new(out))),
         Err(m) => Err(err_fn("phone_normalize", m)),
     }
+}
+
+pub fn helper_metadata() -> Vec<HelperMetadata> {
+    [
+        // §7.1 presence
+        ("present", HelperArity::Exact(1)),
+        ("missing", HelperArity::Exact(1)),
+        ("blank", HelperArity::Exact(1)),
+        ("coalesce", HelperArity::Variadic),
+        ("default", HelperArity::Exact(2)),
+        ("require", HelperArity::Exact(2)),
+        ("null_if", HelperArity::Exact(2)),
+        ("null_if_blank", HelperArity::Exact(1)),
+        // §7.2 type
+        ("type_string", HelperArity::Exact(1)),
+        ("type_int", HelperArity::Exact(1)),
+        ("type_float", HelperArity::Exact(1)),
+        ("type_bool", HelperArity::Exact(1)),
+        ("type_list", HelperArity::Exact(1)),
+        ("type_map", HelperArity::Exact(1)),
+        ("type_is_string", HelperArity::Exact(1)),
+        ("type_is_number", HelperArity::Exact(1)),
+        ("type_is_bool", HelperArity::Exact(1)),
+        ("type_is_list", HelperArity::Exact(1)),
+        ("type_is_map", HelperArity::Exact(1)),
+        // §7.3 text
+        ("text_length", HelperArity::Exact(1)),
+        ("text_lower", HelperArity::Exact(1)),
+        ("text_upper", HelperArity::Exact(1)),
+        ("text_title", HelperArity::Exact(1)),
+        ("text_trim", HelperArity::Exact(1)),
+        ("text_slug", HelperArity::Exact(1)),
+        ("text_left", HelperArity::Exact(2)),
+        ("text_right", HelperArity::Exact(2)),
+        ("text_substr", HelperArity::Exact(3)),
+        ("text_join", HelperArity::Exact(2)),
+        ("text_split", HelperArity::Exact(2)),
+        ("text_replace", HelperArity::Exact(3)),
+        ("text_regex_replace", HelperArity::Exact(3)),
+        ("text_remove_accents", HelperArity::Exact(1)),
+        ("text_normalize_space", HelperArity::Exact(1)),
+        ("text_contains", HelperArity::Exact(2)),
+        ("text_starts_with", HelperArity::Exact(2)),
+        ("text_ends_with", HelperArity::Exact(2)),
+        ("text_matches", HelperArity::Exact(2)),
+        ("text_regex_extract", HelperArity::Exact(3)),
+        // §7.4 name
+        ("name_full", HelperArity::Exact(2)),
+        ("name_parts", HelperArity::Exact(1)),
+        ("name_initials", HelperArity::Exact(1)),
+        // §7.5 date
+        ("date_parse", HelperArity::Exact(2)),
+        ("date_parse_datetime", HelperArity::OneOrTwo),
+        ("date_format", HelperArity::Exact(2)),
+        ("date_is_valid", HelperArity::Exact(1)),
+        ("date_today", HelperArity::Exact(0)),
+        ("date_age_on", HelperArity::Exact(2)),
+        ("date_years_between", HelperArity::Exact(2)),
+        ("date_days_between", HelperArity::Exact(2)),
+        ("date_add_days", HelperArity::Exact(2)),
+        ("date_add_months", HelperArity::Exact(2)),
+        ("date_start_of_month", HelperArity::Exact(1)),
+        ("date_end_of_month", HelperArity::Exact(1)),
+        ("date_is_before", HelperArity::Exact(2)),
+        ("date_is_after", HelperArity::Exact(2)),
+        ("date_min", HelperArity::Exact(2)),
+        ("date_max", HelperArity::Exact(2)),
+        // §7.6 numeric
+        ("num_round", HelperArity::Exact(2)),
+        ("num_floor", HelperArity::Exact(1)),
+        ("num_ceil", HelperArity::Exact(1)),
+        ("num_abs", HelperArity::Exact(1)),
+        ("num_min", HelperArity::Variadic),
+        ("num_max", HelperArity::Variadic),
+        ("num_clamp", HelperArity::Exact(3)),
+        ("num_is_valid", HelperArity::Exact(1)),
+        ("num_parse", HelperArity::Exact(1)),
+        ("num_percent", HelperArity::Exact(2)),
+        ("num_safe_divide", HelperArity::Exact(3)),
+        // §7.7 list
+        ("list_compact", HelperArity::Exact(1)),
+        ("list_flatten", HelperArity::Exact(1)),
+        ("list_unique", HelperArity::Exact(1)),
+        ("list_sort", HelperArity::Exact(1)),
+        ("list_first", HelperArity::Exact(1)),
+        ("list_last", HelperArity::Exact(1)),
+        ("list_at", HelperArity::Exact(3)),
+        ("list_length", HelperArity::Exact(1)),
+        ("list_contains", HelperArity::Exact(2)),
+        ("list_join", HelperArity::Exact(2)),
+        ("list_filter_present", HelperArity::Exact(1)),
+        ("list_of", HelperArity::Variadic),
+        ("coalesce_list", HelperArity::Variadic),
+        ("list_to_map", HelperArity::Exact(2)),
+        // §7.8 map
+        ("map_get", HelperArity::Exact(3)),
+        ("map_has", HelperArity::Exact(2)),
+        ("map_pick", HelperArity::Exact(2)),
+        ("map_omit", HelperArity::Exact(2)),
+        ("map_merge", HelperArity::Exact(2)),
+        ("map_deep_merge", HelperArity::Exact(2)),
+        ("map_set", HelperArity::Exact(3)),
+        ("map_keys", HelperArity::Exact(1)),
+        ("map_values", HelperArity::Exact(1)),
+        ("map_entries", HelperArity::Exact(1)),
+        ("map_of", HelperArity::Variadic),
+        // §7.9 code system
+        ("code_map", HelperArity::Exact(2)),
+        ("code_map_or_null", HelperArity::Exact(2)),
+        ("code_map_or_default", HelperArity::Exact(3)),
+        ("code_label", HelperArity::Exact(3)),
+        ("code_exists", HelperArity::Exact(2)),
+        ("code_canonical", HelperArity::Exact(2)),
+        ("code_reverse_map", HelperArity::Exact(2)),
+        ("code_normalize", HelperArity::OneOrTwo),
+        // §7.10 id
+        ("id_make", HelperArity::Variadic),
+        ("id_uuid_v5", HelperArity::Exact(2)),
+        ("email_normalize", HelperArity::Exact(1)),
+        ("id_hash", HelperArity::Exact(2)),
+        ("id_slug", HelperArity::Exact(2)),
+        ("id_clean", HelperArity::Exact(1)),
+        ("id_is_valid", HelperArity::Exact(2)),
+        // §7.11 person
+        ("person_age", HelperArity::Exact(2)),
+        ("person_is_minor", HelperArity::Exact(3)),
+        ("person_sex_or_gender", HelperArity::Exact(2)),
+        ("person_normalize_phone", HelperArity::Exact(2)),
+        // §7.12 phone
+        ("phone_normalize", HelperArity::Exact(2)),
+        ("phone_is_valid", HelperArity::Exact(2)),
+        ("phone_country_code", HelperArity::Exact(2)),
+        ("phone_mask", HelperArity::Exact(1)),
+        // §7.13 email
+        ("email_is_valid", HelperArity::Exact(1)),
+        ("email_domain", HelperArity::Exact(1)),
+        // §7.14 geo
+        ("geo_point", HelperArity::Exact(2)),
+        ("geo_is_valid_lat", HelperArity::Exact(1)),
+        ("geo_is_valid_lon", HelperArity::Exact(1)),
+        ("geo_normalize_lat", HelperArity::Exact(1)),
+        ("geo_normalize_lon", HelperArity::Exact(1)),
+        ("geo_admin_code", HelperArity::Exact(2)),
+        // §7.15 address
+        ("address_line", HelperArity::Variadic),
+        ("address_normalize_country", HelperArity::Exact(1)),
+        ("address_postal_code", HelperArity::Exact(1)),
+        // §7.16 validation
+        ("validate_required", HelperArity::Exact(2)),
+        ("validate_error", HelperArity::Exact(2)),
+        ("validate_warn", HelperArity::Exact(3)),
+        ("validate_matches", HelperArity::Exact(3)),
+        ("validate_in", HelperArity::Exact(3)),
+        ("validate_range", HelperArity::Exact(4)),
+        // §7.17 json
+        ("json_parse", HelperArity::Exact(1)),
+        ("json_stringify", HelperArity::Exact(1)),
+        ("json_path", HelperArity::Exact(3)),
+        // §7.18 fhir
+        ("fhir_reference", HelperArity::Exact(2)),
+        // §7.19 privacy
+        ("privacy_mask", HelperArity::Exact(2)),
+        ("privacy_sha256", HelperArity::Exact(2)),
+        ("privacy_redact", HelperArity::Exact(1)),
+    ]
+    .into_iter()
+    .map(|(name, arity)| HelperMetadata { name, arity })
+    .collect()
 }

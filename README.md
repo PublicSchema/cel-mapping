@@ -6,19 +6,27 @@ Full behaviour and vocabulary are defined in **[`spec.md`](./spec.md)** (v0.1). 
 
 For the proposed PublicSchema-native runtime refactor, see **[`spec-publicschema-v0.2.md`](./spec-publicschema-v0.2.md)** and the implementation plan in **[`implementation-plan-publicschema-v0.2.md`](./implementation-plan-publicschema-v0.2.md)**.
 
+For the proposed crate-boundary refactor and reusable helper-function crates, see **[`spec-crate-split-v0.3.md`](./spec-crate-split-v0.3.md)**.
+
 Phase 0 gate documents: **[`docs/publicschema-helper-parity.md`](./docs/publicschema-helper-parity.md)** (celext v1 helper inventory and Rust porting status) and **[`docs/publicschema-celpy-behavioral-diff.md`](./docs/publicschema-celpy-behavioral-diff.md)** (celpy behavioral diff template, to be filled before Phase 4).
 
 ## Layout
 
 | Path | Role |
 |------|------|
-| [`crates/cel-mapper-core`](./crates/cel-mapper-core) | Rust library: compile mapping YAML, evaluate, stdlib, limits, expression preview |
+| [`crates/mapping-functions`](./crates/mapping-functions) | Pure deterministic helper functions, typed code-system registry, and ISO preload data with no CEL dependency |
+| [`crates/mapping-functions-cel`](./crates/mapping-functions-cel) | CEL adapter: helper registration, CEL value coercion, helper metadata, and request fallback resolution |
+| [`crates/cel-evaluator`](./crates/cel-evaluator) | Standalone CEL compile/evaluate/preview boundary, expression diagnostics, security limits, and helper registration |
+| [`crates/publicschema-mapping`](./crates/publicschema-mapping) | PublicSchema v0.2 property-mapping compile/evaluate runtime, JSON Pointer writes, hashes, logs, and privacy diagnostics |
+| [`crates/cel-mapper-core`](./crates/cel-mapper-core) | Compatibility facade and v0.1 records mapping runtime |
 | [`crates/cel-mapper-wasm`](./crates/cel-mapper-wasm) | `wasm-bindgen` wrapper (JSON string API) |
 | [`crates/cel-mapper-python`](./crates/cel-mapper-python) | PyO3 extension `cel_mapper` + [`examples/`](./crates/cel-mapper-python/examples/) |
 | [`packages/js`](./packages/js) | TypeScript + `wasm-pack` script targeting `wasm-pkg/` |
 | [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | `fmt` / `clippy` / tests, WASM build + TS, `maturin` + `pytest` + examples |
 
-Workspace `default-members` are **core + wasm** so `cargo test` does not require Python dev libraries; the Python crate remains a workspace member for `cargo test -p cel-mapper-python` (cdylib-only; use **`pytest`** after `maturin develop`).
+Workspace `default-members` include the reusable split crates, core, and WASM so `cargo test` exercises the Rust runtime without requiring Python dev libraries. The Python crate remains a workspace member for `cargo test -p cel-mapper-python` (cdylib-only; use **`pytest`** after `maturin develop`).
+
+Compatibility import paths remain available through **`cel_mapper_core`** during the migration. New Rust consumers can import pure helpers from **`mapping_functions`**, standalone expression APIs from **`cel_evaluator`**, PublicSchema runtime types from **`publicschema_mapping`**, and CEL helper registration/metadata from **`mapping_functions_cel`**.
 
 ## Quick start (Rust)
 

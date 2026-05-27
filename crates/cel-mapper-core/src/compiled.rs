@@ -1,32 +1,8 @@
 use crate::code_system::CodeSystemRegistry;
 use crate::mapping::{FieldYaml, RecordYaml};
-use cel::Program;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ErrorMode {
-    Strict,
-    Collect,
-    Lenient,
-}
-
-impl ErrorMode {
-    pub fn parse(s: Option<&str>) -> Self {
-        match s.unwrap_or("strict").to_lowercase().as_str() {
-            "collect" => ErrorMode::Collect,
-            "lenient" => ErrorMode::Lenient,
-            _ => ErrorMode::Strict,
-        }
-    }
-}
-
-/// Compiled CEL program plus the mapping expression as authored (for errors and diagnostics).
-#[derive(Debug)]
-pub struct CompiledCel {
-    pub program: Program,
-    /// Expression text from the mapping YAML (before namespaced rewrite).
-    pub source: String,
-}
+pub use cel_evaluator::{CompiledCel, ErrorMode};
 
 #[derive(Debug)]
 pub struct CompiledField {

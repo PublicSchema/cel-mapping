@@ -77,7 +77,7 @@ impl MappingRuntime {
         name: &str,
         raw: &serde_yaml::Value,
     ) -> Result<(), CodeSystemError> {
-        self.code_systems.merge_yaml_value(name, raw)
+        crate::code_system::merge_yaml_value(&mut self.code_systems, name, raw)
     }
 
     pub fn compile_mapping(&self, yaml: &str) -> Result<CompiledMapping, CompileError> {

@@ -1,0 +1,33 @@
+[package]
+name = "mapping-functions"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Pure deterministic mapping helper functions"
+
+[features]
+default = ["std", "text", "regex", "email", "ids", "json", "codes"]
+std = []
+text = ["dep:unicode-normalization"]
+regex = ["dep:regex"]
+email = []
+ids = ["dep:sha2", "dep:hex"]
+json = ["dep:serde_json"]
+codes = ["dep:serde", "dep:serde_json"]
+date = ["dep:chrono", "dep:chrono-tz"]
+phone = ["dep:phonenumber"]
+redaction = ["ids"]
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"], optional = true }
+chrono-tz = { version = "0.9", optional = true }
+hex = { version = "0.4", optional = true }
+phonenumber = { version = "0.3", optional = true }
+regex = { version = "1", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+sha2 = { version = "0.10", optional = true }
+thiserror = "1"
+unicode-normalization = { version = "0.1", optional = true }

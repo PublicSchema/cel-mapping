@@ -1,44 +1,27 @@
-//! Per-evaluation thread-local context (ctx.* for host functions, warnings).
+//! Compatibility facade for helper request context and warnings.
 
-use serde_json::Value as JsonValue;
-use std::cell::RefCell;
-
-thread_local! {
-    static CTX: RefCell<Option<JsonValue>> = const { RefCell::new(None) };
-    static WARNINGS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-}
-
-pub fn set_eval_ctx(ctx: JsonValue) {
-    CTX.with(|c| *c.borrow_mut() = Some(ctx));
+pub fn set_eval_ctx(ctx: serde_json::Value) {
+    mapping_functions_cel::eval_ctx::set_eval_ctx(
+        mapping_functions_cel::FunctionRequestContext::from_json(&ctx),
+    );
 }
 
 pub fn clear_eval_ctx() {
-    CTX.with(|c| *c.borrow_mut() = None);
+    mapping_functions_cel::eval_ctx::clear_eval_ctx();
 }
 
-pub fn eval_ctx_get(path: &[&str]) -> Option<JsonValue> {
-    CTX.with(|c| {
-        let root = c.borrow();
-        let v = root.as_ref()?;
-        let mut cur = v.clone();
-        for p in path {
-            cur = cur.get(*p)?.clone();
-        }
-        Some(cur)
-    })
+pub fn eval_ctx_get(path: &[&str]) -> Option<serde_json::Value> {
+    mapping_functions_cel::eval_ctx::eval_ctx_get(path)
 }
 
 pub fn take_warnings() -> Vec<String> {
-    WARNINGS.with(|w| {
-        let mut v = w.borrow_mut();
-        std::mem::take(&mut *v)
-    })
+    mapping_functions_cel::eval_ctx::take_warnings()
 }
 
 pub fn clear_warnings() {
-    WARNINGS.with(|w| w.borrow_mut().clear());
+    mapping_functions_cel::eval_ctx::clear_warnings();
 }
 
 pub fn push_warning(msg: String) {
-    WARNINGS.with(|w| w.borrow_mut().push(msg));
+    mapping_functions_cel::eval_ctx::push_warning(msg);
 }

@@ -8,6 +8,10 @@ description = "CEL-based declarative mapping runtime (spec v0.1)"
 
 [dependencies]
 cel = { version = "0.13", features = ["json", "chrono", "regex"] }
+cel-evaluator = { path = "../cel-evaluator" }
+mapping-functions = { path = "../mapping-functions", features = ["date", "phone", "redaction"] }
+mapping-functions-cel = { path = "../mapping-functions-cel" }
+publicschema-mapping = { path = "../publicschema-mapping" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

@@ -38,6 +38,7 @@ pub use evaluator::{
     preview_cel_expression_with_input, validate_root_binding_name, StandaloneExpressionInput,
 };
 pub use mapping::MappingDocument;
+pub use mapping_functions_cel::{helper_metadata, HelperArity, HelperMetadata};
 pub use paths::primary_binding_hint;
 pub use publicschema::{
     compile_publicschema_mapping, evaluate_publicschema_mapping,

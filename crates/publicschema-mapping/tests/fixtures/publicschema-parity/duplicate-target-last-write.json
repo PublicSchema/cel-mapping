@@ -1,0 +1,36 @@
+{
+  "name": "duplicate-target-last-write",
+  "mapping": {
+    "version": "0.2",
+    "id": "duplicate-target-last-write",
+    "property_mappings": [
+      {
+        "id": "first-write",
+        "source": "/a",
+        "target": "/x"
+      },
+      {
+        "id": "second-write",
+        "source": "/b",
+        "target": "/x"
+      }
+    ]
+  },
+  "direction": "to_target",
+  "source_data": {
+    "a": 1,
+    "b": 2
+  },
+  "ctx": {},
+  "options": {
+    "privacy": "authoring",
+    "errors_mode": "collect"
+  },
+  "expected": {
+    "ok": true,
+    "output": { "x": 2 },
+    "errors_count": 0,
+    "warnings_count": 1,
+    "log_statuses": ["applied", "applied"]
+  }
+}
