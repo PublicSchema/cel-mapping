@@ -1,11 +1,11 @@
-# cel-mapping-js
+# crosswalk-js
 
-TypeScript helpers and **`wasm-pack`** output for **`cel-mapper-wasm`** (web target).
+TypeScript helpers and **`wasm-pack`** output for **`crosswalk-wasm`** (web target).
 
 ## Is the API idiomatic?
 
 - **Low-level:** `WasmMappingRuntime` mirrors Rust: **snake_case** method names and **JSON strings** in/out. That is normal for raw `wasm-bindgen`, not especially idiomatic for application TypeScript.
-- **High-level:** **`CelMapper`** is the idiomatic surface: **`await CelMapper.create()`**, **camelCase** methods, **`unknown` / objects** for `source` / `context`, parsed **`MappingEvaluationResult`** and preview types. Use it in apps; drop to **`.wasm`** when you need full control.
+- **High-level:** **`Crosswalk`** is the idiomatic surface: **`await Crosswalk.create()`**, **camelCase** methods, **`unknown` / objects** for `source` / `context`, parsed **`MappingEvaluationResult`** and preview types. Use it in apps; drop to **`.wasm`** when you need full control.
 
 ## Build
 
@@ -23,7 +23,7 @@ when it is installed so the `wasm32-unknown-unknown` target is visible.
 ## Example 1 — evaluate a mapping (high-level)
 
 ```typescript
-import { CelMapper } from "cel-mapping-js";
+import { Crosswalk } from "crosswalk-js";
 
 const yaml = `
 version: "0.1"
@@ -34,7 +34,7 @@ records:
       hello: "source.name"
 `;
 
-const mapper = await CelMapper.create();
+const mapper = await Crosswalk.create();
 mapper.setRuntimeOptions({ default_errors_mode: "collect" });
 
 const out = mapper.evaluate(yaml, { name: "Ada" }, { today: "2026-05-03" });
@@ -48,9 +48,9 @@ if (out.errors.length) {
 ## Example 2 — mapping metadata before evaluate
 
 ```typescript
-import { CelMapper } from "cel-mapping-js";
+import { Crosswalk } from "crosswalk-js";
 
-const mapper = await CelMapper.create();
+const mapper = await Crosswalk.create();
 const meta = mapper.compileMappingMeta(mappingYaml);
 console.log(meta.name, meta.version);
 ```
@@ -58,9 +58,9 @@ console.log(meta.name, meta.version);
 ## Example 3 — editor: preview a raw CEL expression
 
 ```typescript
-import { CelMapper } from "cel-mapping-js";
+import { Crosswalk } from "crosswalk-js";
 
-const mapper = await CelMapper.create();
+const mapper = await Crosswalk.create();
 const preview = mapper.previewExpression("source.count + 1", { count: 2 }, {});
 
 if (preview.issues.length) {
@@ -73,9 +73,9 @@ if (preview.issues.length) {
 ## Example 4 — probe one expression (no mapping YAML)
 
 ```typescript
-import { CelMapper } from "cel-mapping-js";
+import { Crosswalk } from "crosswalk-js";
 
-const mapper = await CelMapper.create();
+const mapper = await Crosswalk.create();
 const r = mapper.evaluateExpression("source.x * 2", { x: 21 }, {});
 if (r.ok) console.log(r.value);
 else console.error(r.error);
@@ -84,9 +84,9 @@ else console.error(r.error);
 ## Example 5 — PublicSchema value mappings
 
 ```typescript
-import { CelMapper } from "cel-mapping-js";
+import { Crosswalk } from "crosswalk-js";
 
-const mapper = await CelMapper.create();
+const mapper = await Crosswalk.create();
 const result = mapper.evaluatePublicSchemaMapping(mappingYaml, { sex: "U" }, {}, {
   errors_mode: "collect",
   privacy: "authoring",
@@ -104,10 +104,10 @@ lookups where multiple `source_value`s share the same `target_value`.
 ## Example 6 — low-level wasm (snake_case + strings)
 
 ```typescript
-import { init, CelMapperWasm } from "cel-mapping-js";
+import { init, CrosswalkWasm } from "crosswalk-js";
 
 await init();
-const rt = new CelMapperWasm.WasmMappingRuntime();
+const rt = new CrosswalkWasm.WasmMappingRuntime();
 const json = rt.evaluate_json(
   mappingYaml,
   JSON.stringify({ x: 1 }),
@@ -118,4 +118,4 @@ const out = JSON.parse(json);
 
 ## Bundlers
 
-Serve **`wasm-pkg/*.wasm`** from your static root (or pass an explicit URL/module into **`CelMapper.create(fetch("…/cel_mapper_wasm_bg.wasm"))`** per wasm-bindgen web init rules). Vite / Next / etc. usually need a rule to treat `.wasm` as a URL asset.
+Serve **`wasm-pkg/*.wasm`** from your static root (or pass an explicit URL/module into **`Crosswalk.create(fetch("…/crosswalk_wasm_bg.wasm"))`** per wasm-bindgen web init rules). Vite / Next / etc. usually need a rule to treat `.wasm` as a URL asset.

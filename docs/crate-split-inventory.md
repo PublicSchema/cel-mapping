@@ -4,12 +4,12 @@ Status: implementation inventory for `spec-crate-split-v0.3.md`.
 
 ## Helper Semantics
 
-Current CEL helper registration moved to `mapping-functions-cel`; pure deterministic helper semantics live in `mapping-functions` where the v0.3 API exists. The adapter preserves current CEL names, arity checks, null/missing coercion, warnings, and compatibility behavior.
+Current CEL helper registration moved to `crosswalk-functions-cel`; pure deterministic helper semantics live in `crosswalk-functions` where the v0.3 API exists. The adapter preserves current CEL names, arity checks, null/missing coercion, warnings, and compatibility behavior.
 
 Important preserved behavior:
 
 - `text_regex_extract` returns an empty string through CEL when the pattern does not match or a capture group is missing.
-- Direct Rust `mapping_functions::text::regex_extract` returns `Ok(None)` when the pattern does not match.
+- Direct Rust `crosswalk_functions::text::regex_extract` returns `Ok(None)` when the pattern does not match.
 - `date_parse_datetime` resolves offset-less datetime fallback from adapter request `timezone`.
 - `date_today` resolves adapter request `today`.
 - `phone_*` helpers use the explicit country argument first, then adapter request `country` when the argument is null or missing.
@@ -17,29 +17,29 @@ Important preserved behavior:
 
 ## Helper Ownership
 
-- `mapping-functions`: text, email, phone, date, IDs, redaction, JSON parse/stringify, code-system registry, code entries, typed code-system documents, and ISO preload.
-- `mapping-functions-cel`: CEL `Value` conversion, helper registration, arity validation, missing/null compatibility, request fallback resolution, warning collection, and helper metadata.
-- `cel-evaluator`: standalone expression compile/evaluate/preview, security limits, expression diagnostics, missing-path injection, CEL/JSON conversion, and reusable compiled-expression wrappers.
-- `publicschema-mapping`: PublicSchema v0.2 document parsing, compile/evaluate, value mappings, JSON Pointer reads/writes, deterministic hash, logs, warnings, and privacy-aware log values.
-- `cel-mapper-core`: v0.1 mapping runtime and compatibility facade. It still preserves existing public core paths for current bindings and callers.
+- `crosswalk-functions`: text, email, phone, date, IDs, redaction, JSON parse/stringify, code-system registry, code entries, typed code-system documents, and ISO preload.
+- `crosswalk-functions-cel`: CEL `Value` conversion, helper registration, arity validation, missing/null compatibility, request fallback resolution, warning collection, and helper metadata.
+- `crosswalk-cel`: standalone expression compile/evaluate/preview, security limits, expression diagnostics, missing-path injection, CEL/JSON conversion, and reusable compiled-expression wrappers.
+- `crosswalk-publicschema`: PublicSchema v0.2 document parsing, compile/evaluate, value mappings, JSON Pointer reads/writes, deterministic hash, logs, warnings, and privacy-aware log values.
+- `crosswalk-core`: v0.1 mapping runtime and compatibility facade. It still preserves existing public core paths for current bindings and callers.
 
 ## Public Types And Re-Export Paths
 
-Existing `cel_mapper_core` public paths retained:
+Existing `crosswalk_core` public paths retained:
 
 - `MappingRuntime`, `RuntimeOptions`, `EvaluationInput`, `MappingOutput`
 - `CompiledMapping`, `CompiledCel`, `ErrorMode`
 - `CodeEntry`, `CodeSystemRegistry`
 - `CompileError`, `MappingError`, `ErrorCode`, `ErrorSeverity`
 - `StandaloneExpressionInput`, `StandaloneEvalError`, `ExpressionPreviewResult`, `ExpressionIssue`, `ExpressionPhase`
-- PublicSchema facade types and functions currently exported from `cel_mapper_core`
+- PublicSchema facade types and functions currently exported from `crosswalk_core`
 
 New direct crate paths:
 
-- `mapping_functions::{text,email,phone,date,ids,redaction,json,codes}`
-- `mapping_functions_cel::{register_stdlib,register_mapping_functions,helper_metadata}`
-- `cel_evaluator::{compile_expr,evaluate_cel_expression,preview_cel_expression,SecurityLimits}`
-- `publicschema_mapping::{compile_publicschema_mapping,evaluate_publicschema_mapping}`
+- `crosswalk_functions::{text,email,phone,date,ids,redaction,json,codes}`
+- `crosswalk_functions_cel::{register_stdlib,register_crosswalk_functions,helper_metadata}`
+- `crosswalk_cel::{compile_expr,evaluate_cel_expression,preview_cel_expression,SecurityLimits}`
+- `crosswalk_publicschema::{compile_publicschema_mapping,evaluate_publicschema_mapping}`
 
 ## Serde And Trait Notes
 
@@ -55,5 +55,5 @@ No diagnostic wording changes are intentionally accepted in this implementation.
 ## Pitfalls Logged
 
 - The existing PublicSchema evaluator did not set thread-local helper context. This was surprising because generic and standalone evaluation do install context. The split preserves that behavior to avoid unreviewed drift.
-- `serde_yaml` remains above `mapping-functions`; the leaf crate accepts typed `CodeSystemDocument` values and uses a simple embedded ISO loader without `serde_yaml`.
+- `serde_yaml` remains above `crosswalk-functions`; the leaf crate accepts typed `CodeSystemDocument` values and uses a simple embedded ISO loader without `serde_yaml`.
 - `cel::ExecutionError` remains inside adapter/evaluator internals. Public standalone APIs expose stable evaluator errors instead.

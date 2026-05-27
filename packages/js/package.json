@@ -1,8 +1,8 @@
 {
-  "name": "cel-mapping-js",
+  "name": "crosswalk-js",
   "private": true,
   "version": "0.1.0",
-  "description": "TypeScript helpers and wasm-pack build for cel-mapper-wasm (web target).",
+  "description": "TypeScript helpers and wasm-pack build for crosswalk-wasm (web target).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,7 +17,7 @@
     "wasm-pkg"
   ],
   "scripts": {
-    "build:wasm": "PATH=$HOME/.cargo/bin:$PATH wasm-pack build ../../crates/cel-mapper-wasm --target web --out-dir ../../packages/js/wasm-pkg",
+    "build:wasm": "PATH=$HOME/.cargo/bin:$PATH wasm-pack build ../../crates/crosswalk-wasm --target web --out-dir ../../packages/js/wasm-pkg",
     "build:ts": "tsc -p tsconfig.json",
     "build": "npm run build:wasm && npm run build:ts",
     "test": "npm run build && node --test tests/*.test.mjs"

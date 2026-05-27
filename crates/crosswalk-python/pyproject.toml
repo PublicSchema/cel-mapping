@@ -1,0 +1,20 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "crosswalk"
+version = "0.1.1"
+description = "CEL mapping runtime (PyO3 bindings to crosswalk-core)"
+requires-python = ">=3.10,<3.14"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.maturin]
+module-name = "crosswalk"
+manifest-path = "Cargo.toml"

@@ -1,22 +1,22 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/mapping-functions",
-    "crates/mapping-functions-cel",
-    "crates/cel-evaluator",
-    "crates/publicschema-mapping",
-    "crates/cel-mapper-core",
-    "crates/cel-mapper-wasm",
-    "crates/cel-mapper-python",
+    "crates/crosswalk-functions",
+    "crates/crosswalk-functions-cel",
+    "crates/crosswalk-cel",
+    "crates/crosswalk-publicschema",
+    "crates/crosswalk-core",
+    "crates/crosswalk-wasm",
+    "crates/crosswalk-python",
 ]
 # PyO3 links libpython; keep it out of the default graph so `cargo test` works without Python dev libs.
 default-members = [
-    "crates/mapping-functions",
-    "crates/mapping-functions-cel",
-    "crates/cel-evaluator",
-    "crates/publicschema-mapping",
-    "crates/cel-mapper-core",
-    "crates/cel-mapper-wasm",
+    "crates/crosswalk-functions",
+    "crates/crosswalk-functions-cel",
+    "crates/crosswalk-cel",
+    "crates/crosswalk-publicschema",
+    "crates/crosswalk-core",
+    "crates/crosswalk-wasm",
 ]
 
 [workspace.package]
@@ -24,4 +24,4 @@ version = "0.1.1"
 edition = "2021"
 rust-version = "1.83"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/PublicSchema/cel-mapping"
+repository = "https://github.com/PublicSchema/crosswalk"

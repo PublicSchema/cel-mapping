@@ -1,8 +1,8 @@
-# PublicSchema celpy → cel-mapping Migration Changelog
+# PublicSchema celpy → crosswalk Migration Changelog
 
 Status: post-migration. The hosted runtime cutover from `celpy` to the
-`cel-mapping` Rust core is complete; the celext v1 → cel-mapping rewriter at
-`publicschema-build/build/cel_mapping_adapter.py::rewrite_celext_v1_to_cel_mapping`
+`crosswalk` Rust core is complete; the celext v1 → crosswalk rewriter at
+`publicschema-build/build/crosswalk_adapter.py::rewrite_celext_v1_to_crosswalk`
 is the canonical translation surface. The shadow-mode acceptance corpus at
 `publicschema.com/apps/core/tests/parity/test_shadow_zero_diff.py` enforces
 zero-diff transformed output between the two runtimes on every commit.
@@ -16,9 +16,9 @@ Spec reference: `spec-publicschema-v0.2.md` §13.
 
 Status values:
 
-- `matches`: cel-mapping and celpy produce the same result; pinned by a
+- `matches`: crosswalk and celpy produce the same result; pinned by a
   parity fixture.
-- `intentional-diff`: cel-mapping deliberately diverges from celpy because
+- `intentional-diff`: crosswalk deliberately diverges from celpy because
   the spec mandates the new behavior; reason recorded inline.
 - `migrated-rewrite`: the difference is hidden from authors by the rewriter
   (e.g. `parseDate` token translation); both runtimes produce the same
@@ -41,7 +41,7 @@ explicitly in the source JSON is a different value from a missing path.
 
 **Status:** unverified
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/missing-vs-null.json` (to be created)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/missing-vs-null.json` (to be created)
 
 ### 1.2 Missing propagation into CEL expressions
 
@@ -67,7 +67,7 @@ null substitution.
 
 **Status:** unverified
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/missing-optional-omits.json` (to be created)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/missing-optional-omits.json` (to be created)
 
 ---
 
@@ -111,7 +111,7 @@ non-array, this is a `write_error` (spec §7.2).
 
 **Status:** unverified
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/array-append.json` (to be created)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/array-append.json` (to be created)
 
 ### 2.4 Missing intermediate object creation on target write
 
@@ -167,7 +167,7 @@ section 2) must bridge the two dialects when registering `parseDate` and
 
 **Status:** intentional-diff (token dialect translation required; see helper parity doc)
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/date-format-tokens.json` (to be created)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/date-format-tokens.json` (to be created)
 
 ### 3.2 ISO-8601 string input to formatDate
 
@@ -197,7 +197,7 @@ datetimes rather than requiring `ctx.timezone`.
 
 **Status:** unverified (likely intentional-diff if celpy defaults to UTC)
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/date-parse-datetime-offsetless.json` (to be created)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/date-parse-datetime-offsetless.json` (to be created)
 
 ### 3.4 Ambiguous local time (DST overlap)
 
@@ -244,7 +244,7 @@ permits large integers in output JSON.
 
 **Status:** unverified (likely intentional-diff; Rust enforces JS-safe range, Python/celpy does not)
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/numeric-js-safe-range.json` (to be created)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/numeric-js-safe-range.json` (to be created)
 
 ### 4.2 Float-to-int truncation behavior
 
@@ -423,13 +423,13 @@ different behavior (e.g. first-write-wins, merge, or an error).
 
 **Status:** unverified
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/duplicate-target-last-write.json` (to be created; listed in implementation plan §3.1)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/duplicate-target-last-write.json` (to be created; listed in implementation plan §3.1)
 
 ---
 
 ## 10. Intentional non-parity decisions
 
-This section records places where `cel-mapping` deliberately diverges from
+This section records places where `crosswalk` deliberately diverges from
 `celpy` behavior and those divergences have been accepted.
 
 ### 10.1 No identity fallback on formula error
@@ -445,7 +445,7 @@ formula errors.
 
 **Status:** intentional-diff (fail-closed is required by spec)
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/formula-error-fails-closed.json` (to be created)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/formula-error-fails-closed.json` (to be created)
 
 ### 10.2 Wrong-direction formula is an error, not identity
 
@@ -459,7 +459,7 @@ missing-formula identity.
 
 **Status:** intentional-diff (required by spec)
 
-**Test fixture:** `crates/cel-mapper-core/tests/fixtures/publicschema-parity/wrong-direction-no-identity.json` (listed in implementation plan §3.1)
+**Test fixture:** `crates/crosswalk-core/tests/fixtures/publicschema-parity/wrong-direction-no-identity.json` (listed in implementation plan §3.1)
 
 ### 10.3 JS-safe integer range enforcement
 

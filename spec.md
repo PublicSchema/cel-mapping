@@ -1583,7 +1583,7 @@ In `collect` mode, errors do not prevent other record instances from being emitt
 
 # 10. Rust API
 
-This section describes the **reference implementation** in `crates/cel-mapper-core` (names and signatures may drift slightly; see `cargo doc -p cel-mapper-core`).
+This section describes the **reference implementation** in `crates/crosswalk-core` (names and signatures may drift slightly; see `cargo doc -p crosswalk-core`).
 
 ## 10.1 Core structs
 
@@ -1680,7 +1680,7 @@ Serialization to JSON for bindings uses the same field names (`snake_case` in Ru
 
 ## 11.1 Build and package layout
 
-The WASM crate is **`crates/cel-mapper-wasm`**. A typical build writes into **`packages/js/wasm-pkg/`** (see root `README.md` and `packages/js` scripts).
+The WASM crate is **`crates/crosswalk-wasm`**. A typical build writes into **`packages/js/wasm-pkg/`** (see root `README.md` and `packages/js` scripts).
 
 The generated **`WasmMappingRuntime`** type is a thin wrapper: methods take and return **JSON strings** for portability across hosts.
 
@@ -1689,7 +1689,7 @@ The generated **`WasmMappingRuntime`** type is a thin wrapper: methods take and 
 Illustrative usage from TypeScript/JavaScript (pseudo; exact imports depend on `wasm-pack` target):
 
 ```ts id="5gws7b"
-import init, { WasmMappingRuntime } from "./wasm-pkg/cel_mapper_wasm.js";
+import init, { WasmMappingRuntime } from "./wasm-pkg/crosswalk_wasm.js";
 
 await init();
 
@@ -1736,7 +1736,7 @@ type MappingResult = {
 - **`evaluate_expression_json(expr, source_json, ctx_json)`** — returns **`{"ok": true, "value": …}`** on success, or **`{"ok": false, "error": "…"}`** when `source_json` is not valid JSON or CEL compile/evaluate fails (message is the same `Display` as Rust `StandaloneEvalError`). Invalid **`ctx_json`** is treated like mapping evaluation: replaced with **`{}`**.
 - **`preview_expression_json(expr, source_json, ctx_json)`** — always returns JSON matching Rust **`ExpressionPreviewResult`** (serde field names: `author_expression`, `rewritten_expression`, `value`, `issues`, `notes`). Invalid **`source_json`** becomes a single **`issues`** entry (phase **`evaluation`**, validation-style message); invalid **`ctx_json`** → **`{}`**.
 
-The **`packages/js`** entry re-exports the wasm module, typed **`parseEvaluateExpressionJson`** / **`parsePreviewExpressionJson`**, and a higher-level **`CelMapper`** class (camelCase, object in / parsed results out). See **`packages/js/README.md`** for usage examples.
+The **`packages/js`** entry re-exports the wasm module, typed **`parseEvaluateExpressionJson`** / **`parsePreviewExpressionJson`**, and a higher-level **`Crosswalk`** class (camelCase, object in / parsed results out). See **`packages/js/README.md`** for usage examples.
 
 ---
 
@@ -1744,10 +1744,10 @@ The **`packages/js`** entry re-exports the wasm module, typed **`parseEvaluateEx
 
 ## 12.1 Package
 
-Published-style name (workspace crate **`cel-mapper-python`**):
+Published-style name (workspace crate **`crosswalk-python`**):
 
 ```text id="qtgap1"
-cel_mapper
+crosswalk
 ```
 
 ## 12.2 Python usage
@@ -1755,7 +1755,7 @@ cel_mapper
 The extension uses **dict in/out** for evaluation where possible; JSON-string helpers remain for interop. Construct **`MappingRuntime`** with no args (defaults) or pass **`runtime_options`** as a dict or JSON string (`timezone`, `locale`, `max_expression_cost`, `default_errors_mode`).
 
 ```python id="dwcv7j"
-from cel_mapper import MappingRuntime, MappingCompileError, CompiledMapping
+from crosswalk import MappingRuntime, MappingCompileError, CompiledMapping
 
 rt = MappingRuntime({"default_errors_mode": "collect", "timezone": "Asia/Bangkok"})
 
@@ -1939,9 +1939,9 @@ CEL’s non-Turing-complete, mutation-free design helps here, but the host still
 # 16. Recommended Project Layout
 
 ```text id="re2er3"
-cel-mapper/
+crosswalk/
   crates/
-    cel-mapper-core/
+    crosswalk-core/
       src/
         lib.rs
         value.rs
@@ -1959,10 +1959,10 @@ cel-mapper/
           code.rs
           id.rs
           validation.rs
-    cel-mapper-wasm/
+    crosswalk-wasm/
       src/
         lib.rs
-    cel-mapper-python/
+    crosswalk-python/
       src/
         lib.rs
   packages/

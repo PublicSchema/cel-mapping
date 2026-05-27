@@ -1,12 +1,12 @@
-# cel-mapping Crate Split v0.3 Refactor Spec
+# crosswalk Crate Split v0.3 Refactor Spec
 
-Status: draft  
-Audience: `cel-mapping`, `registry-relay`, `registry-witness`, PublicSchema tooling, generated bindings  
-Scope: split reusable transformation semantics out of the current `cel-mapper-core` monolith while preserving current runtime behavior
+Status: draft
+Audience: `crosswalk`, `registry-relay`, `registry-witness`, PublicSchema tooling, generated bindings
+Scope: split reusable transformation semantics out of the current `crosswalk-core` monolith while preserving current runtime behavior
 
 ## 1. Purpose
 
-`cel-mapping` currently combines four concerns in one Rust crate:
+`crosswalk` currently combines four concerns in one Rust crate:
 
 - generic v0.1 mapping compilation and evaluation
 - standalone CEL expression evaluation
@@ -40,8 +40,8 @@ This refactor splits the crate graph now, while external adoption is still low, 
 Current package layout:
 
 ```text
-cel-mapping
-  crates/cel-mapper-core
+crosswalk
+  crates/crosswalk-core
     ast_paths.rs
     budget.rs
     cel_scan.rs
@@ -62,17 +62,17 @@ cel-mapping
     publicschema/
     runtime.rs
     security.rs
-  crates/cel-mapper-python
-  crates/cel-mapper-wasm
+  crates/crosswalk-python
+  crates/crosswalk-wasm
   packages/js
 ```
 
 Important existing behavior:
 
-- `cel_mapper_core::MappingRuntime` is the main facade for generic mappings, standalone expressions, and PublicSchema mappings.
-- `cel_mapper_core::publicschema` is already implemented inside the core crate.
-- `publicschema/mod.rs` directly uses core-owned compile, evaluator, compiled mapping, path, security, and code-system types. This means `publicschema-mapping` cannot be extracted cleanly until those dependencies are available outside `cel-mapper-core`.
-- `crates/cel-mapper-core/src/functions/builtins.rs` contains pure helper logic mixed with CEL registration, argument coercion, and `ExecutionError` construction.
+- `crosswalk_core::MappingRuntime` is the main facade for generic mappings, standalone expressions, and PublicSchema mappings.
+- `crosswalk_core::publicschema` is already implemented inside the core crate.
+- `publicschema/mod.rs` directly uses core-owned compile, evaluator, compiled mapping, path, security, and code-system types. This means `crosswalk-publicschema` cannot be extracted cleanly until those dependencies are available outside `crosswalk-core`.
+- `crates/crosswalk-core/src/functions/builtins.rs` contains pure helper logic mixed with CEL registration, argument coercion, and `ExecutionError` construction.
 - `functions/phone.rs` and date helpers in `functions/builtins.rs` read fallback values from `eval_ctx_get`, including `ctx.country`, `ctx.timezone`, and `ctx.today`.
 - `code_system.rs` owns `CodeSystemRegistry`, and helper registration captures an `Arc<CodeSystemRegistry>`.
 - `iso_systems.rs` loads built-in code systems into `CodeSystemRegistry`.
@@ -88,37 +88,37 @@ The refactor must treat this as a migration from a working monolith, not as a re
 Required v0.3 dependency target:
 
 ```text
-cel-mapper-python / cel-mapper-wasm / packages/js
+crosswalk-python / crosswalk-wasm / packages/js
         |
         v
-cel-mapper-core facade
+crosswalk-core facade
         |
         +--------------------+
         |                    |
         v                    v
-publicschema-mapping     cel-evaluator
+crosswalk-publicschema     crosswalk-cel
         |                    |
-        +--> cel-evaluator   v
-        |              mapping-functions-cel
+        +--> crosswalk-cel   v
+        |              crosswalk-functions-cel
         |                    |
         v                    v
-mapping-functions <----------+
+crosswalk-functions <----------+
 ```
 
 Equivalent dependency list:
 
 ```text
-cel-mapper-core -> publicschema-mapping
-cel-mapper-core -> cel-evaluator
-publicschema-mapping -> cel-evaluator
-publicschema-mapping -> mapping-functions
-cel-evaluator -> mapping-functions-cel
-mapping-functions-cel -> mapping-functions
+crosswalk-core -> crosswalk-publicschema
+crosswalk-core -> crosswalk-cel
+crosswalk-publicschema -> crosswalk-cel
+crosswalk-publicschema -> crosswalk-functions
+crosswalk-cel -> crosswalk-functions-cel
+crosswalk-functions-cel -> crosswalk-functions
 ```
 
-In this graph, arrows point from consumer to dependency. `publicschema-mapping` depends directly on `mapping-functions` for code systems and pure helper semantics. It does not depend on `mapping-functions-cel`, because CEL registration is an evaluator concern. `cel-mapper-core` can remain the compatibility facade because `publicschema-mapping` depends on `cel-evaluator`, not on `cel-mapper-core`.
+In this graph, arrows point from consumer to dependency. `crosswalk-publicschema` depends directly on `crosswalk-functions` for code systems and pure helper semantics. It does not depend on `crosswalk-functions-cel`, because CEL registration is an evaluator concern. `crosswalk-core` can remain the compatibility facade because `crosswalk-publicschema` depends on `crosswalk-cel`, not on `crosswalk-core`.
 
-`cel-evaluator` is required in v0.3. It is not needed for the first text-helper extraction, but it is a required wave before `publicschema-mapping` can move. If the team decides not to extract `cel-evaluator`, then `publicschema-mapping` must be scoped out of v0.3.
+`crosswalk-cel` is required in v0.3. It is not needed for the first text-helper extraction, but it is a required wave before `crosswalk-publicschema` can move. If the team decides not to extract `crosswalk-cel`, then `crosswalk-publicschema` must be scoped out of v0.3.
 
 Compatibility target during migration:
 
@@ -126,10 +126,10 @@ Compatibility target during migration:
 external callers
       |
       v
-cel_mapper_core re-exports
+crosswalk_core re-exports
       |
-      +--> publicschema_mapping
-      +--> mapping_functions_cel
+      +--> crosswalk_publicschema
+      +--> crosswalk_functions_cel
       +--> generic v0.1 core runtime
 ```
 
@@ -140,11 +140,11 @@ mapping-bundle
   workbook, multi-sheet, and multi-record orchestration
 ```
 
-The first split should avoid creating more crates than needed. The required runtime split is `mapping-functions`, `mapping-functions-cel`, `cel-evaluator`, `publicschema-mapping`, and the existing `cel-mapper-core` facade. `mapping-bundle` should be added only when a concrete workbook or multi-registry consumer needs it.
+The first split should avoid creating more crates than needed. The required runtime split is `crosswalk-functions`, `crosswalk-functions-cel`, `crosswalk-cel`, `crosswalk-publicschema`, and the existing `crosswalk-core` facade. `mapping-bundle` should be added only when a concrete workbook or multi-registry consumer needs it.
 
 ## 6. Crate Contracts
 
-### 6.1 `mapping-functions`
+### 6.1 `crosswalk-functions`
 
 Purpose: pure deterministic helper functions for mappings and registry transforms.
 
@@ -161,14 +161,14 @@ Rules:
 Suggested modules:
 
 ```text
-mapping_functions::text
-mapping_functions::email
-mapping_functions::phone
-mapping_functions::date
-mapping_functions::codes
-mapping_functions::ids
-mapping_functions::redaction
-mapping_functions::json
+crosswalk_functions::text
+crosswalk_functions::email
+crosswalk_functions::phone
+crosswalk_functions::date
+crosswalk_functions::codes
+crosswalk_functions::ids
+crosswalk_functions::redaction
+crosswalk_functions::json
 ```
 
 Initial text/string API:
@@ -216,9 +216,9 @@ impl CodeSystemRegistry {
 pub fn load_iso_systems(registry: &mut CodeSystemRegistry);
 ```
 
-`CodeSystemRegistry`, `CodeEntry`, normalization, lookup, reverse lookup, and ISO preload logic move with the code helpers because code-system helpers are not CEL-specific. `cel-mapper-core` re-exports the types during the compatibility window.
+`CodeSystemRegistry`, `CodeEntry`, normalization, lookup, reverse lookup, and ISO preload logic move with the code helpers because code-system helpers are not CEL-specific. `crosswalk-core` re-exports the types during the compatibility window.
 
-YAML parsing stays one layer above `mapping-functions`. The leaf crate may expose serde-compatible typed documents, but it MUST NOT require `serde_yaml` in its default dependency graph. `cel-mapper-core` and `publicschema-mapping` parse YAML into `CodeSystemDocument` before calling `mapping-functions`.
+YAML parsing stays one layer above `crosswalk-functions`. The leaf crate may expose serde-compatible typed documents, but it MUST NOT require `serde_yaml` in its default dependency graph. `crosswalk-core` and `crosswalk-publicschema` parse YAML into `CodeSystemDocument` before calling `crosswalk-functions`.
 
 Error rules:
 
@@ -233,7 +233,7 @@ Feature flags:
 - Default features: `std`, `text`, `regex`, `email`, `ids`, `json`, `codes`.
 - Optional features: `date`, `phone`, `redaction`.
 - `std` remains enabled by default. `no_std` is not required for v0.3.
-- Feature-gated modules still ship in Wave 1. `date`, `phone`, and `redaction` are implemented and tested behind non-default features; `mapping-functions-cel` enables the feature set it needs in its own `Cargo.toml`.
+- Feature-gated modules still ship in Wave 1. `date`, `phone`, and `redaction` are implemented and tested behind non-default features; `crosswalk-functions-cel` enables the feature set it needs in its own `Cargo.toml`.
 
 Semantic preservation rules:
 
@@ -241,9 +241,9 @@ Semantic preservation rules:
 - `regex_extract` returns `Ok(None)` when the pattern does not match. The CEL adapter MUST preserve today's behavior by converting `None` to `Value::String("")`, not `Null`.
 - Phone and date helpers never read thread-local evaluation context directly. The CEL adapter resolves `ctx.country`, `ctx.timezone`, and `ctx.today` before calling pure functions.
 
-### 6.2 `mapping-functions-cel`
+### 6.2 `crosswalk-functions-cel`
 
-Purpose: register `mapping-functions` helpers into the CEL runtime.
+Purpose: register `crosswalk-functions` helpers into the CEL runtime.
 
 Rules:
 
@@ -256,7 +256,7 @@ Rules:
 Suggested API:
 
 ```rust
-pub fn register_mapping_functions(ctx: &mut cel::Context, registry: FunctionRegistry, request: FunctionRequestContext);
+pub fn register_crosswalk_functions(ctx: &mut cel::Context, registry: FunctionRegistry, request: FunctionRequestContext);
 pub fn helper_metadata() -> Vec<HelperMetadata>;
 ```
 
@@ -271,15 +271,15 @@ pub fn helper_metadata() -> Vec<HelperMetadata>;
 
 Compatibility rule:
 
-- Until `eval_ctx.rs` is removed or moved into `cel-evaluator`, the adapter may read the existing thread-local context. It must immediately resolve those values and pass explicit arguments to `mapping-functions`.
+- Until `eval_ctx.rs` is removed or moved into `crosswalk-cel`, the adapter may read the existing thread-local context. It must immediately resolve those values and pass explicit arguments to `crosswalk-functions`.
 
 Layering rule:
 
-- `cel-evaluator` owns expression request context for evaluation and any temporary storage strategy.
-- `mapping-functions-cel` owns helper fallback resolution and receives only the helper-facing `FunctionRequestContext`.
-- `mapping-functions-cel` MUST NOT depend on `cel-evaluator`; `cel-evaluator` converts its request context into `FunctionRequestContext` when registering helpers.
+- `crosswalk-cel` owns expression request context for evaluation and any temporary storage strategy.
+- `crosswalk-functions-cel` owns helper fallback resolution and receives only the helper-facing `FunctionRequestContext`.
+- `crosswalk-functions-cel` MUST NOT depend on `crosswalk-cel`; `crosswalk-cel` converts its request context into `FunctionRequestContext` when registering helpers.
 
-### 6.3 `cel-mapper-core`
+### 6.3 `crosswalk-core`
 
 Purpose: generic mapping runtime and compatibility facade.
 
@@ -292,17 +292,17 @@ Responsibilities after the split:
 
 Rules:
 
-- MUST depend on `cel-evaluator` after Wave 3.
-- MAY depend on `mapping-functions-cel` only during the transition before `cel-evaluator` owns function registration.
+- MUST depend on `crosswalk-cel` after Wave 3.
+- MAY depend on `crosswalk-functions-cel` only during the transition before `crosswalk-cel` owns function registration.
 - SHOULD NOT contain pure helper implementations after Wave 2.
 - SHOULD keep `MappingRuntime::register_standard_functions` behavior stable.
 - MUST keep v0.1 mapping document errors and generic `MappingOutput` ownership unless a later spec extracts the generic mapping runtime.
-- MUST continue to support existing Rust callers importing PublicSchema types from `cel_mapper_core` until the compatibility window ends.
+- MUST continue to support existing Rust callers importing PublicSchema types from `crosswalk_core` until the compatibility window ends.
 
 Compatibility re-export examples:
 
 ```rust
-pub use publicschema_mapping::{
+pub use crosswalk_publicschema::{
     CompiledPublicSchemaMapping,
     PrivacyMode,
     PublicSchemaCompileOptions,
@@ -313,7 +313,7 @@ pub use publicschema_mapping::{
 };
 ```
 
-### 6.4 `cel-evaluator`
+### 6.4 `crosswalk-cel`
 
 Purpose: standalone CEL compile, evaluate, preview, security limits, and mapping function registration.
 
@@ -322,18 +322,18 @@ Responsibilities:
 - compile a CEL expression with the project security limits.
 - evaluate expressions against root bindings.
 - preview expressions with structured diagnostics.
-- register `mapping-functions-cel` helpers.
+- register `crosswalk-functions-cel` helpers.
 - expose the narrow evaluator API used by both generic mappings and PublicSchema mappings.
 - own or re-export the evaluator-adjacent modules currently needed by PublicSchema extraction: reusable compiled expression wrappers, expression compile/evaluate code, `security`, `paths`, `ast_paths`, `missing`, `expr`, `budget`, `eval_ctx`, and expression preview/evaluation errors.
 
 Rules:
 
-- MUST NOT depend on `cel-mapper-core`.
-- MUST NOT depend on `publicschema-mapping`.
+- MUST NOT depend on `crosswalk-core`.
+- MUST NOT depend on `crosswalk-publicschema`.
 - MUST own CEL-specific missing-value behavior only when it is independent of a mapping document.
 - MUST expose request context explicitly even if it temporarily preserves the current thread-local implementation internally.
 - MUST NOT expose `cel::ExecutionError` across public crate boundaries. Adapter and evaluator code convert it into stable `FunctionError`, `ExpressionError`, or mapping-specific diagnostics.
-- MUST NOT own `MappingOutput`; that remains with the v0.1 generic mapping runtime in `cel-mapper-core`.
+- MUST NOT own `MappingOutput`; that remains with the v0.1 generic mapping runtime in `crosswalk-core`.
 - SHOULD keep generic enough APIs for `registry-witness` evidence expressions.
 
 Suggested API:
@@ -350,7 +350,7 @@ impl ExpressionRuntime {
 }
 ```
 
-### 6.5 `publicschema-mapping`
+### 6.5 `crosswalk-publicschema`
 
 Purpose: PublicSchema v0.2 compile and evaluate semantics.
 
@@ -367,14 +367,14 @@ Responsibilities:
 
 Dependencies:
 
-- MUST NOT depend on `cel-mapper-core` while `cel-mapper-core` re-exports PublicSchema types.
-- MUST depend on `cel-evaluator` for expression compile, evaluate, and preview.
-- MUST depend on `mapping-functions` for `CodeSystemRegistry` and code-system helpers.
+- MUST NOT depend on `crosswalk-core` while `crosswalk-core` re-exports PublicSchema types.
+- MUST depend on `crosswalk-cel` for expression compile, evaluate, and preview.
+- MUST depend on `crosswalk-functions` for `CodeSystemRegistry` and code-system helpers.
 - MUST NOT depend on Python, WASM, TypeScript, registry relay, registry witness, or hosted PublicSchema services.
 
 API must match the current core-exported PublicSchema types unless a breaking release is explicitly accepted.
 
-### 6.6 `cel-mapper-python`, `cel-mapper-wasm`, and `packages/js`
+### 6.6 `crosswalk-python`, `crosswalk-wasm`, and `packages/js`
 
 Purpose: preserve existing bindings while internals move.
 
@@ -382,8 +382,8 @@ Rules:
 
 - Python and WASM bindings should keep current method names.
 - TypeScript wrapper should keep camelCase methods.
-- Bindings can import from `cel-mapper-core` compatibility re-exports first.
-- After the split stabilizes, bindings MAY import PublicSchema types directly from `publicschema-mapping` if that reduces coupling.
+- Bindings can import from `crosswalk-core` compatibility re-exports first.
+- After the split stabilizes, bindings MAY import PublicSchema types directly from `crosswalk-publicschema` if that reduces coupling.
 
 ### 6.7 Later `mapping-bundle`
 
@@ -393,7 +393,7 @@ This crate is intentionally out of scope for v0.3. It becomes useful when XLS fi
 
 ## 7. Naming Decision
 
-Use `mapping-functions` rather than `cel-functions`.
+Use `crosswalk-functions` rather than `cel-functions`.
 
 Rationale:
 
@@ -401,9 +401,9 @@ Rationale:
 - The crate will be useful in registry import/export code, witness normalization, workbook validation, and generated validators.
 - CEL is one adapter, not the owner of the semantics.
 
-Use `mapping-functions-cel` for the adapter crate.
+Use `crosswalk-functions-cel` for the adapter crate.
 
-Use `publicschema-mapping` for the PublicSchema runtime crate, because it owns PublicSchema mapping document semantics rather than generic mapping semantics.
+Use `crosswalk-publicschema` for the PublicSchema runtime crate, because it owns PublicSchema mapping document semantics rather than generic mapping semantics.
 
 ## 8. Workspace And Release Plan
 
@@ -415,27 +415,27 @@ Rust version:
 
 Versioning:
 
-- `mapping-functions`, `mapping-functions-cel`, `cel-evaluator`, and `publicschema-mapping` should use explicit crate versions rather than `version.workspace = true`.
+- `crosswalk-functions`, `crosswalk-functions-cel`, `crosswalk-cel`, and `crosswalk-publicschema` should use explicit crate versions rather than `version.workspace = true`.
 - Initial extracted crate versions should start at `0.1.0`.
-- `cel-mapper-core`, `cel-mapper-wasm`, and `cel-mapper-python` may keep the workspace version while they remain distribution facades.
+- `crosswalk-core`, `crosswalk-wasm`, and `crosswalk-python` may keep the workspace version while they remain distribution facades.
 
 Publish order:
 
 ```text
-mapping-functions
-mapping-functions-cel
-cel-evaluator
-publicschema-mapping
-cel-mapper-core
-cel-mapper-wasm / cel-mapper-python
+crosswalk-functions
+crosswalk-functions-cel
+crosswalk-cel
+crosswalk-publicschema
+crosswalk-core
+crosswalk-wasm / crosswalk-python
 packages/js
 ```
 
 Workspace membership:
 
 - Add each new crate to `workspace.members` in the wave where it is introduced.
-- Add `mapping-functions`, `mapping-functions-cel`, `cel-evaluator`, and `publicschema-mapping` to `default-members` once each crate has tests that do not require Python development libraries.
-- Keep `cel-mapper-python` out of `default-members` unless the workspace Python build constraint changes.
+- Add `crosswalk-functions`, `crosswalk-functions-cel`, `crosswalk-cel`, and `crosswalk-publicschema` to `default-members` once each crate has tests that do not require Python development libraries.
+- Keep `crosswalk-python` out of `default-members` unless the workspace Python build constraint changes.
 
 Parallel edit coordination:
 
@@ -453,7 +453,7 @@ Deliverables:
 - Current helper names are inventoried from `functions/builtins.rs`, including exact no-match, null, missing, fallback, and error-code behavior.
 - Public types, trait impls, `From` / `Into` impls, serde derives, generic bounds, and re-export paths are inventoried before any type moves.
 - The inventory is recorded in `docs/crate-split-inventory.md` and reviewed before Wave 1 starts.
-- PublicSchema helper parity docs identify which helpers move to `mapping-functions` and which stay adapter-only.
+- PublicSchema helper parity docs identify which helpers move to `crosswalk-functions` and which stay adapter-only.
 - `workspace.package.rust-version = "1.83"` is added before new crates are introduced.
 - Feature flags and `FunctionError` code stability are treated as resolved decisions, not open questions.
 
@@ -466,15 +466,15 @@ Review:
 
 Deliverables:
 
-- Add `crates/mapping-functions`.
+- Add `crates/crosswalk-functions`.
 - Use explicit `version = "0.1.0"` and `rust-version.workspace = true`.
 - Use default features `std`, `text`, `regex`, `email`, `ids`, `json`, and `codes`.
 - Move pure text, email, phone, ID, regex, date, JSON, and redaction logic into typed modules.
 - Ship `phone`, `date`, and `redaction` behind non-default features in Wave 1 even though they are not default-enabled.
-- Move `CodeSystemRegistry`, `CodeEntry`, code normalization, and ISO code-system loading into `mapping-functions::codes`.
-- Keep YAML parsing in `cel-mapper-core` and `publicschema-mapping`; pass typed code-system documents into `mapping-functions`.
+- Move `CodeSystemRegistry`, `CodeEntry`, code normalization, and ISO code-system loading into `crosswalk-functions::codes`.
+- Keep YAML parsing in `crosswalk-core` and `crosswalk-publicschema`; pass typed code-system documents into `crosswalk-functions`.
 - Keep existing CEL helper behavior unchanged by calling into the new crate from the current core functions module.
-- Add focused unit tests in `mapping-functions`.
+- Add focused unit tests in `crosswalk-functions`.
 
 Parallel work:
 
@@ -493,11 +493,11 @@ Integration rule:
 
 Deliverables:
 
-- Add `crates/mapping-functions-cel`.
+- Add `crates/crosswalk-functions-cel`.
 - Use explicit `version = "0.1.0"` and `rust-version.workspace = true`.
-- Move `register_stdlib` and CEL conversion wrappers out of `cel-mapper-core`.
+- Move `register_stdlib` and CEL conversion wrappers out of `crosswalk-core`.
 - Move request-context fallback resolution for `country`, `timezone`, `today`, and warnings into the adapter boundary.
-- Keep `cel_mapper_core::functions::register_stdlib` as an internal compatibility shim until core modules are updated.
+- Keep `crosswalk_core::functions::register_stdlib` as an internal compatibility shim until core modules are updated.
 - Add adapter tests proving current helper names, arity behavior, null behavior, missing behavior, and error codes remain stable.
 - Add explicit tests that `text_regex_extract` returns `""` on no match through CEL while direct Rust `regex_extract` returns `Ok(None)`.
 
@@ -515,12 +515,12 @@ Review:
 
 Deliverables:
 
-- Add `crates/cel-evaluator`.
+- Add `crates/crosswalk-cel`.
 - Use explicit `version = "0.1.0"` and `rust-version.workspace = true`.
 - Move standalone CEL compile, evaluate, preview, security limits, expression diagnostics, and function registration behind the new crate.
 - Move or re-home evaluator dependencies currently imported by PublicSchema: `compiled`, `compiler`, `evaluator`, `security`, `paths`, `ast_paths`, `missing`, `expr`, `budget`, `eval_ctx`, and shared expression errors.
-- Keep `cel_mapper_core::evaluator::*` as compatibility re-exports or wrappers.
-- Update generic mapping runtime to call `cel-evaluator`.
+- Keep `crosswalk_core::evaluator::*` as compatibility re-exports or wrappers.
+- Update generic mapping runtime to call `crosswalk-cel`.
 - Update `registry-witness` compile checks if it imports standalone expression APIs.
 
 Parallel work:
@@ -537,11 +537,11 @@ Review:
 
 Deliverables:
 
-- Add `crates/publicschema-mapping`.
+- Add `crates/crosswalk-publicschema`.
 - Use explicit `version = "0.1.0"` and `rust-version.workspace = true`.
 - Move PublicSchema document types, compile, evaluate, pointer, hash, and output logic into the new crate.
-- Depend on `cel-evaluator` and `mapping-functions`; do not depend on `cel-mapper-core`.
-- Keep `cel_mapper_core` re-exporting PublicSchema public types and runtime methods.
+- Depend on `crosswalk-cel` and `crosswalk-functions`; do not depend on `crosswalk-core`.
+- Keep `crosswalk_core` re-exporting PublicSchema public types and runtime methods.
 - Update Python, WASM, and TypeScript surfaces only where imports require it.
 
 Parallel work:
@@ -558,8 +558,8 @@ Review:
 
 Deliverables:
 
-- `registry-relay` compiles against either compatibility re-exports or direct `publicschema-mapping` imports.
-- `registry-witness` compiles against standalone expression APIs and can optionally use `mapping-functions` for non-CEL normalization.
+- `registry-relay` compiles against either compatibility re-exports or direct `crosswalk-publicschema` imports.
+- `registry-witness` compiles against standalone expression APIs and can optionally use `crosswalk-functions` for non-CEL normalization.
 - Examples and README snippets are updated.
 
 Parallel work:
@@ -577,7 +577,7 @@ Review:
 Deliverables:
 
 - Mark compatibility re-exports with documentation explaining their migration path.
-- Decide whether to keep `cel-mapper-core` as the long-term facade.
+- Decide whether to keep `crosswalk-core` as the long-term facade.
 - Remove only compatibility shims that have a documented replacement and a release note.
 
 This wave can be deferred until real consumers have migrated.
@@ -586,10 +586,10 @@ This wave can be deferred until real consumers have migrated.
 
 Required test layers:
 
-- `mapping-functions` unit tests for every extracted pure helper.
-- `mapping-functions-cel` adapter tests for CEL arity, coercion, null, missing, and error behavior.
-- `cel-evaluator` tests for expression evaluation, preview diagnostics, security limits, and missing-value behavior.
-- Existing `cel-mapper-core` mapping tests.
+- `crosswalk-functions` unit tests for every extracted pure helper.
+- `crosswalk-functions-cel` adapter tests for CEL arity, coercion, null, missing, and error behavior.
+- `crosswalk-cel` tests for expression evaluation, preview diagnostics, security limits, and missing-value behavior.
+- Existing `crosswalk-core` mapping tests.
 - Existing PublicSchema golden parity fixtures.
 - Python binding tests.
 - WASM and TypeScript wrapper tests.
@@ -607,15 +607,15 @@ Recommended commands:
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p mapping-functions
-cargo test -p mapping-functions-cel
-cargo test -p cel-evaluator
-cargo test -p cel-mapper-core -p cel-mapper-wasm
-cargo test -p cel-mapper-python
+cargo test -p crosswalk-functions
+cargo test -p crosswalk-functions-cel
+cargo test -p crosswalk-cel
+cargo test -p crosswalk-core -p crosswalk-wasm
+cargo test -p crosswalk-python
 cd packages/js && npm ci && npm run build:wasm && npm run build:ts && npm test
 ```
 
-If Python dev libraries are unavailable, `cargo test -p cel-mapper-python` may be replaced by the project-supported `maturin develop` plus `pytest` workflow.
+If Python dev libraries are unavailable, `cargo test -p crosswalk-python` may be replaced by the project-supported `maturin develop` plus `pytest` workflow.
 
 ## 11. Definition Of Done
 
@@ -624,40 +624,40 @@ The v0.3 crate split is done only when every item below is satisfied. A missing 
 Required files and workspace metadata:
 
 - Root `Cargo.toml` has `workspace.package.rust-version = "1.83"`.
-- `crates/mapping-functions`, `crates/mapping-functions-cel`, `crates/cel-evaluator`, and `crates/publicschema-mapping` exist and are listed in `workspace.members`.
-- `mapping-functions`, `mapping-functions-cel`, `cel-evaluator`, and `publicschema-mapping` use explicit `version = "0.1.0"` and inherit or repeat `rust-version = "1.83"`.
-- `mapping-functions`, `mapping-functions-cel`, `cel-evaluator`, and `publicschema-mapping` are included in `default-members`.
+- `crates/crosswalk-functions`, `crates/crosswalk-functions-cel`, `crates/crosswalk-cel`, and `crates/crosswalk-publicschema` exist and are listed in `workspace.members`.
+- `crosswalk-functions`, `crosswalk-functions-cel`, `crosswalk-cel`, and `crosswalk-publicschema` use explicit `version = "0.1.0"` and inherit or repeat `rust-version = "1.83"`.
+- `crosswalk-functions`, `crosswalk-functions-cel`, `crosswalk-cel`, and `crosswalk-publicschema` are included in `default-members`.
 - `docs/crate-split-inventory.md` exists and records helper semantics, public types, trait impls, serde behavior, generic bounds, re-export paths, ownership moves, and accepted diagnostic wording changes.
 - README and crate-level docs name the new crates, their responsibilities, and the compatibility import paths.
 
 Required dependency boundaries:
 
-- `mapping-functions` has no dependency on `cel`, `cel-mapper-core`, `mapping-functions-cel`, `cel-evaluator`, `publicschema-mapping`, Python, WASM, TypeScript, or `serde_yaml` in its default dependency graph.
-- `mapping-functions` default features are exactly `std`, `text`, `regex`, `email`, `ids`, `json`, and `codes`.
-- `mapping-functions` ships `date`, `phone`, and `redaction` behind non-default features.
-- `mapping-functions-cel` depends on `mapping-functions` and does not depend on `cel-evaluator`.
-- `cel-evaluator` depends on `mapping-functions-cel` and does not depend on `cel-mapper-core` or `publicschema-mapping`.
-- `publicschema-mapping` depends on `cel-evaluator` and `mapping-functions`, and does not depend on `cel-mapper-core` or `mapping-functions-cel`.
-- `cel-mapper-core` remains the facade and may depend on `cel-evaluator`, `publicschema-mapping`, and `mapping-functions`.
+- `crosswalk-functions` has no dependency on `cel`, `crosswalk-core`, `crosswalk-functions-cel`, `crosswalk-cel`, `crosswalk-publicschema`, Python, WASM, TypeScript, or `serde_yaml` in its default dependency graph.
+- `crosswalk-functions` default features are exactly `std`, `text`, `regex`, `email`, `ids`, `json`, and `codes`.
+- `crosswalk-functions` ships `date`, `phone`, and `redaction` behind non-default features.
+- `crosswalk-functions-cel` depends on `crosswalk-functions` and does not depend on `crosswalk-cel`.
+- `crosswalk-cel` depends on `crosswalk-functions-cel` and does not depend on `crosswalk-core` or `crosswalk-publicschema`.
+- `crosswalk-publicschema` depends on `crosswalk-cel` and `crosswalk-functions`, and does not depend on `crosswalk-core` or `crosswalk-functions-cel`.
+- `crosswalk-core` remains the facade and may depend on `crosswalk-cel`, `crosswalk-publicschema`, and `crosswalk-functions`.
 
 Required ownership:
 
-- Pure helper logic from `functions/builtins.rs` lives in `mapping-functions`, except CEL-only arity, coercion, missing/null, and error-conversion code.
-- `CodeSystemRegistry`, `CodeEntry`, code normalization, and ISO code-system loading live in `mapping-functions::codes`.
-- YAML parsing for code systems lives outside `mapping-functions`; callers pass typed code-system documents to the leaf crate.
-- `mapping-functions-cel` owns CEL helper registration, CEL `Value` conversion, arity validation, helper metadata, and fallback resolution for `country`, `timezone`, `today`, and warnings.
-- `cel-evaluator` owns standalone CEL compile, evaluate, preview, security limits, expression diagnostics, evaluator request context, and evaluator-adjacent modules required by PublicSchema.
-- `cel-evaluator` public APIs do not expose `cel::ExecutionError`.
-- `MappingOutput`, `EvaluationInput`, and v0.1 mapping document errors remain owned by `cel-mapper-core`.
-- PublicSchema document parsing, compile, evaluate, pointer writes, value mappings, canonical hash, logs, warnings, and privacy-aware diagnostics live in `publicschema-mapping`.
+- Pure helper logic from `functions/builtins.rs` lives in `crosswalk-functions`, except CEL-only arity, coercion, missing/null, and error-conversion code.
+- `CodeSystemRegistry`, `CodeEntry`, code normalization, and ISO code-system loading live in `crosswalk-functions::codes`.
+- YAML parsing for code systems lives outside `crosswalk-functions`; callers pass typed code-system documents to the leaf crate.
+- `crosswalk-functions-cel` owns CEL helper registration, CEL `Value` conversion, arity validation, helper metadata, and fallback resolution for `country`, `timezone`, `today`, and warnings.
+- `crosswalk-cel` owns standalone CEL compile, evaluate, preview, security limits, expression diagnostics, evaluator request context, and evaluator-adjacent modules required by PublicSchema.
+- `crosswalk-cel` public APIs do not expose `cel::ExecutionError`.
+- `MappingOutput`, `EvaluationInput`, and v0.1 mapping document errors remain owned by `crosswalk-core`.
+- PublicSchema document parsing, compile, evaluate, pointer writes, value mappings, canonical hash, logs, warnings, and privacy-aware diagnostics live in `crosswalk-publicschema`.
 
 Required compatibility:
 
 - Existing helper names and namespaced aliases continue to work.
 - CEL `text_regex_extract` returns `""` on no match.
-- Direct Rust `mapping_functions::text::regex_extract` returns `Ok(None)` on no match.
+- Direct Rust `crosswalk_functions::text::regex_extract` returns `Ok(None)` on no match.
 - Python, WASM, and TypeScript public method names and JSON shapes are unchanged.
-- `cel-mapper-core` re-exports preserve current public import paths for moved PublicSchema and evaluator types.
+- `crosswalk-core` re-exports preserve current public import paths for moved PublicSchema and evaluator types.
 - Compile-time compatibility tests cover public types, serde behavior, generic bounds, `From` / `Into` impls, and documented re-export paths.
 - `registry-relay` and `registry-witness` compile against the resulting API in the shared workspace.
 
@@ -665,54 +665,54 @@ Required verification:
 
 - `cargo fmt --all -- --check` passes.
 - `cargo clippy --workspace --all-targets -- -D warnings` passes.
-- `cargo test -p mapping-functions` passes with default features and with `--all-features`.
-- `cargo test -p mapping-functions-cel` passes.
-- `cargo test -p cel-evaluator` passes.
-- `cargo test -p publicschema-mapping` passes.
-- `cargo test -p cel-mapper-core -p cel-mapper-wasm` passes.
-- Python binding tests pass through the project-supported `maturin develop` plus `pytest` flow, or `cargo test -p cel-mapper-python` if that is the supported local command.
+- `cargo test -p crosswalk-functions` passes with default features and with `--all-features`.
+- `cargo test -p crosswalk-functions-cel` passes.
+- `cargo test -p crosswalk-cel` passes.
+- `cargo test -p crosswalk-publicschema` passes.
+- `cargo test -p crosswalk-core -p crosswalk-wasm` passes.
+- Python binding tests pass through the project-supported `maturin develop` plus `pytest` flow, or `cargo test -p crosswalk-python` if that is the supported local command.
 - `cd packages/js && npm ci && npm run build:wasm && npm run build:ts && npm test` passes.
 - Existing v0.1 mapping fixtures and PublicSchema golden parity fixtures pass without output changes except accepted diagnostic wording changes recorded in `docs/crate-split-inventory.md`.
 - No unrelated files, generated artifacts, lockfiles, or snapshots are changed unless the PR explicitly identifies why the change is required.
 
 ## 12. Risks And Mitigations
 
-Risk: over-splitting creates more maintenance cost than value.  
-Mitigation: extract only the required runtime crates in order: `mapping-functions`, `mapping-functions-cel`, `cel-evaluator`, and `publicschema-mapping`. Defer only `mapping-bundle`.
+Risk: over-splitting creates more maintenance cost than value.
+Mitigation: extract only the required runtime crates in order: `crosswalk-functions`, `crosswalk-functions-cel`, `crosswalk-cel`, and `crosswalk-publicschema`. Defer only `mapping-bundle`.
 
-Risk: dependency cycles between `cel-mapper-core` and `publicschema-mapping`.  
-Mitigation: extract `cel-evaluator` before moving PublicSchema code, then make both crates depend on the evaluator boundary.
+Risk: dependency cycles between `crosswalk-core` and `crosswalk-publicschema`.
+Mitigation: extract `crosswalk-cel` before moving PublicSchema code, then make both crates depend on the evaluator boundary.
 
-Risk: pure helper behavior diverges from CEL behavior.  
-Mitigation: adapter tests must compare CEL calls against direct `mapping-functions` calls for representative inputs and explicitly assert any compatibility mapping such as `None` to `""`.
+Risk: pure helper behavior diverges from CEL behavior.
+Mitigation: adapter tests must compare CEL calls against direct `crosswalk-functions` calls for representative inputs and explicitly assert any compatibility mapping such as `None` to `""`.
 
-Risk: request-scoped fallback behavior leaks back into pure helpers.  
+Risk: request-scoped fallback behavior leaks back into pure helpers.
 Mitigation: pure helper APIs accept explicit fallback arguments, and adapter tests cover `country`, `timezone`, and `today` resolution.
 
-Risk: bindings accidentally change JSON shapes.  
-Mitigation: keep bindings on `cel-mapper-core` re-exports during the first migration and run binding-level tests before cleanup.
+Risk: bindings accidentally change JSON shapes.
+Mitigation: keep bindings on `crosswalk-core` re-exports during the first migration and run binding-level tests before cleanup.
 
-Risk: downstream registry projects import internal modules.  
+Risk: downstream registry projects import internal modules.
 Mitigation: expose explicit public crates and document imports for `registry-relay` and `registry-witness`.
 
 ## 13. Decisions And Remaining Open Questions
 
 Resolved for v0.3:
 
-- `cel-evaluator` is required before `publicschema-mapping` extraction.
-- Default `mapping-functions` features are `std`, `text`, `regex`, `email`, `ids`, `json`, and `codes`.
+- `crosswalk-cel` is required before `crosswalk-publicschema` extraction.
+- Default `crosswalk-functions` features are `std`, `text`, `regex`, `email`, `ids`, `json`, and `codes`.
 - `FunctionError` codes are a public API contract in v0.3; prose messages are not.
 - Rust helper naming uses `remove_accents`; CEL compatibility keeps `text_remove_accents`.
 - Direct Rust `regex_extract` returns `Ok(None)` on no match; CEL `text_regex_extract` maps no match to `""`.
-- `MappingOutput` and v0.1 mapping document errors stay in `cel-mapper-core`.
+- `MappingOutput` and v0.1 mapping document errors stay in `crosswalk-core`.
 - `cel::ExecutionError` is adapter/evaluator-internal and is converted before crossing public crate boundaries.
-- Code-system YAML parsing stays above `mapping-functions`; the leaf crate accepts typed code-system documents.
+- Code-system YAML parsing stays above `crosswalk-functions`; the leaf crate accepts typed code-system documents.
 
 Remaining open questions:
 
-- Should `cel-mapper-core` remain the long-term facade crate, or should callers eventually import `publicschema-mapping` and `mapping-functions` directly?
-- Should `cel-evaluator` expose only JSON input/output, or should it expose lower-level CEL `Value` APIs for internal callers?
-- Should `mapping-functions` expose JSON helpers through `serde_json::Value`, or should JSON-related helpers live in a separate crate later?
+- Should `crosswalk-core` remain the long-term facade crate, or should callers eventually import `crosswalk-publicschema` and `crosswalk-functions` directly?
+- Should `crosswalk-cel` expose only JSON input/output, or should it expose lower-level CEL `Value` APIs for internal callers?
+- Should `crosswalk-functions` expose JSON helpers through `serde_json::Value`, or should JSON-related helpers live in a separate crate later?
 
 ## 14. Recommended First Slice
 
@@ -727,11 +727,11 @@ Reason:
 
 First-slice acceptance:
 
-- `mapping-functions::text` implements `trim`, `lower_ascii`, `upper_ascii`, `title_simple`, `normalize_space`, `remove_accents`, `slug`, `regex_replace`, and `regex_extract`.
+- `crosswalk-functions::text` implements `trim`, `lower_ascii`, `upper_ascii`, `title_simple`, `normalize_space`, `remove_accents`, `slug`, `regex_replace`, and `regex_extract`.
 - Existing CEL helpers call the new text functions.
 - Existing text helper behavior is unchanged.
 - Direct Rust tests and CEL adapter tests both pass.
-- README documents that `mapping-functions` is the crate to reuse outside CEL.
+- README documents that `crosswalk-functions` is the crate to reuse outside CEL.
 
 ## 15. Implementation Plan And Wave Gates
 
@@ -759,46 +759,46 @@ Review checkpoint:
 - Domain reviewer confirms helper semantics match real registry and government data workflows.
 - Wave 1 cannot start until both reviews are approved.
 
-### Wave 1: Extract `mapping-functions`
+### Wave 1: Extract `crosswalk-functions`
 
 Parallel work:
 
 - Worker A extracts text, email, ID, and redaction helpers with tests.
 - Worker B extracts phone and date helpers behind non-default features with tests.
 - Worker C extracts code-system types, ISO loading, and JSON helpers with tests.
-- Integration owner creates `crates/mapping-functions`, features, public modules, workspace membership, and compatibility calls from existing core helper code.
+- Integration owner creates `crates/crosswalk-functions`, features, public modules, workspace membership, and compatibility calls from existing core helper code.
 
 Wave 1 definition of done:
 
-- `mapping-functions` builds with default features and `--all-features`.
-- `mapping-functions` has no forbidden dependencies listed in Section 11.
-- `CodeSystemRegistry`, `CodeEntry`, typed code-system documents, and ISO loading live in `mapping-functions::codes`.
+- `crosswalk-functions` builds with default features and `--all-features`.
+- `crosswalk-functions` has no forbidden dependencies listed in Section 11.
+- `CodeSystemRegistry`, `CodeEntry`, typed code-system documents, and ISO loading live in `crosswalk-functions::codes`.
 - CEL behavior is unchanged because existing core helper entry points call the extracted helpers.
-- `cargo test -p mapping-functions` and `cargo test -p mapping-functions --all-features` pass.
-- Existing `cargo test -p cel-mapper-core` passes.
+- `cargo test -p crosswalk-functions` and `cargo test -p crosswalk-functions --all-features` pass.
+- Existing `cargo test -p crosswalk-core` passes.
 
 Review checkpoint:
 
 - Reviewer compares helper inventory against moved modules and confirms every moved helper has tests.
-- Reviewer confirms `serde_yaml` is not in the default `mapping-functions` dependency graph.
+- Reviewer confirms `serde_yaml` is not in the default `crosswalk-functions` dependency graph.
 - Wave 2 cannot start until helper behavior parity is approved.
 
-### Wave 2: Extract `mapping-functions-cel`
+### Wave 2: Extract `crosswalk-functions-cel`
 
 Parallel work:
 
 - Worker A moves CEL registration and helper metadata.
 - Worker B ports text, email, phone, and date adapter tests.
 - Worker C ports code-system, ID, redaction, validation, null, missing, and error tests.
-- Integration owner creates `crates/mapping-functions-cel`, features, public API, and the `cel_mapper_core::functions::register_stdlib` compatibility shim.
+- Integration owner creates `crates/crosswalk-functions-cel`, features, public API, and the `crosswalk_core::functions::register_stdlib` compatibility shim.
 
 Wave 2 definition of done:
 
-- `mapping-functions-cel` owns CEL `Value` conversion, arity validation, helper metadata, and fallback resolution for `country`, `timezone`, `today`, and warnings.
-- `mapping-functions-cel` does not depend on `cel-evaluator`.
+- `crosswalk-functions-cel` owns CEL `Value` conversion, arity validation, helper metadata, and fallback resolution for `country`, `timezone`, `today`, and warnings.
+- `crosswalk-functions-cel` does not depend on `crosswalk-cel`.
 - Adapter tests assert `text_regex_extract` returns `""` on no match through CEL.
-- Direct Rust tests still assert `mapping_functions::text::regex_extract` returns `Ok(None)` on no match.
-- `cargo test -p mapping-functions-cel` and `cargo test -p cel-mapper-core` pass.
+- Direct Rust tests still assert `crosswalk_functions::text::regex_extract` returns `Ok(None)` on no match.
+- `cargo test -p crosswalk-functions-cel` and `cargo test -p crosswalk-core` pass.
 
 Review checkpoint:
 
@@ -806,22 +806,22 @@ Review checkpoint:
 - Reviewer confirms request-context fallback resolution is in the adapter boundary.
 - Wave 3 cannot start until CEL parity is approved.
 
-### Wave 3: Extract `cel-evaluator`
+### Wave 3: Extract `crosswalk-cel`
 
 Parallel work:
 
 - Worker A moves expression compile, evaluate, missing-value, path, and output conversion internals needed by standalone CEL.
 - Worker B moves preview diagnostics, security limits, budget handling, request context, and expression errors.
-- Worker C updates `cel-mapper-core` compatibility wrappers and `registry-witness` compile checks.
-- Integration owner creates `crates/cel-evaluator`, public API, workspace membership, and re-exports.
+- Worker C updates `crosswalk-core` compatibility wrappers and `registry-witness` compile checks.
+- Integration owner creates `crates/crosswalk-cel`, public API, workspace membership, and re-exports.
 
 Wave 3 definition of done:
 
-- `cel-evaluator` does not depend on `cel-mapper-core` or `publicschema-mapping`.
-- `cel-evaluator` public APIs do not expose `cel::ExecutionError`.
-- `MappingOutput`, `EvaluationInput`, and v0.1 mapping document errors remain in `cel-mapper-core`.
+- `crosswalk-cel` does not depend on `crosswalk-core` or `crosswalk-publicschema`.
+- `crosswalk-cel` public APIs do not expose `cel::ExecutionError`.
+- `MappingOutput`, `EvaluationInput`, and v0.1 mapping document errors remain in `crosswalk-core`.
 - Standalone expression evaluation and preview results are unchanged against existing fixtures.
-- `cargo test -p cel-evaluator`, `cargo test -p cel-mapper-core`, and the `registry-witness` compile check pass.
+- `cargo test -p crosswalk-cel`, `cargo test -p crosswalk-core`, and the `registry-witness` compile check pass.
 
 Review checkpoint:
 
@@ -829,22 +829,22 @@ Review checkpoint:
 - Reviewer confirms standalone expression JSON and diagnostic shapes are unchanged.
 - Wave 4 cannot start until evaluator compatibility is approved.
 
-### Wave 4: Extract `publicschema-mapping`
+### Wave 4: Extract `crosswalk-publicschema`
 
 Parallel work:
 
 - Worker A moves PublicSchema document parsing, compile, hash, and metadata.
 - Worker B moves evaluate, pointer writes, value mappings, logs, warnings, privacy, and diagnostics.
 - Worker C updates Python, WASM, TypeScript, and `registry-relay` imports through compatibility re-exports.
-- Integration owner creates `crates/publicschema-mapping`, public API, workspace membership, and `cel-mapper-core` re-exports.
+- Integration owner creates `crates/crosswalk-publicschema`, public API, workspace membership, and `crosswalk-core` re-exports.
 
 Wave 4 definition of done:
 
-- `publicschema-mapping` depends on `cel-evaluator` and `mapping-functions`.
-- `publicschema-mapping` does not depend on `cel-mapper-core` or `mapping-functions-cel`.
+- `crosswalk-publicschema` depends on `crosswalk-cel` and `crosswalk-functions`.
+- `crosswalk-publicschema` does not depend on `crosswalk-core` or `crosswalk-functions-cel`.
 - PublicSchema golden parity fixtures pass without output changes except accepted diagnostic wording changes.
-- `cel-mapper-core` compatibility imports for PublicSchema types compile.
-- `cargo test -p publicschema-mapping`, `cargo test -p cel-mapper-core`, and the `registry-relay` compile check pass.
+- `crosswalk-core` compatibility imports for PublicSchema types compile.
+- `cargo test -p crosswalk-publicschema`, `cargo test -p crosswalk-core`, and the `registry-relay` compile check pass.
 
 Review checkpoint:
 

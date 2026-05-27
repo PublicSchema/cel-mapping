@@ -1,12 +1,12 @@
-# cel-mapping PublicSchema v0.2 Refactor Spec
+# crosswalk PublicSchema v0.2 Refactor Spec
 
-Status: draft  
-Audience: `cel-mapping`, `publicschema-build`, `publicschema.com`, generated validator packages  
-Scope: refactor `cel-mapping` into the native deterministic mapping runtime for PublicSchema
+Status: draft
+Audience: `crosswalk`, `publicschema-build`, `publicschema.com`, generated validator packages
+Scope: refactor `crosswalk` into the native deterministic mapping runtime for PublicSchema
 
 ## 1. Purpose
 
-`cel-mapping` v0.2 should become the canonical runtime and compiler for PublicSchema transformation semantics.
+`crosswalk` v0.2 should become the canonical runtime and compiler for PublicSchema transformation semantics.
 
 The current v0.1 runtime is a good generic CEL mapping engine, but PublicSchema needs more than generic record emission. It needs a runtime that understands profile/system mappings, JSON Pointer reads and writes, directional formulas, authoring diagnostics, transformation logs, quality metadata, generated validator parity, and hosted API behavior.
 
@@ -16,7 +16,7 @@ The goal is not to discard PublicSchema's mapping model. The goal is to move its
 PublicSchema mapping YAML
         |
         v
-cel-mapping compile
+crosswalk compile
         |
         v
 compiled mapping / diagnostics / manifest
@@ -32,7 +32,7 @@ compiled mapping / diagnostics / manifest
 
 PublicSchema's mapping shape remains the authoring and API contract.
 
-`cel-mapping` becomes the native execution engine for that contract.
+`crosswalk` becomes the native execution engine for that contract.
 
 This means v0.2 must support PublicSchema-style `property_mappings[]` directly, rather than requiring every caller to translate into the v0.1 `records.*.fields` format.
 
@@ -65,8 +65,8 @@ with validation, deterministic diagnostics, release gating, generated validators
 Therefore:
 
 - PublicSchema mappings MAY export to YARRRML/RML when targeting RDF or JSON-LD artifacts.
-- `cel-mapping` MAY borrow ideas from YARRRML, such as sources, iterators, conditions, external references, and function metadata.
-- `cel-mapping` MUST NOT make `predicateobjects` or RDF triples the core transform model.
+- `crosswalk` MAY borrow ideas from YARRRML, such as sources, iterators, conditions, external references, and function metadata.
+- `crosswalk` MUST NOT make `predicateobjects` or RDF triples the core transform model.
 - CEL remains the primary expression language for PublicSchema transforms.
 
 ## 5. Core Concepts
@@ -489,7 +489,7 @@ Workbench should use this API for inline formula feedback.
 
 ## 11. Compile API
 
-`cel-mapping` should expose compile APIs for both generic v0.1 records and PublicSchema v0.2 property mappings.
+`crosswalk` should expose compile APIs for both generic v0.1 records and PublicSchema v0.2 property mappings.
 
 Rust:
 
@@ -502,7 +502,7 @@ let out = rt.evaluate_publicschema_mapping(&compiled, input)?;
 Python:
 
 ```python
-from cel_mapper import MappingRuntime
+from crosswalk import MappingRuntime
 
 rt = MappingRuntime()
 compiled = rt.compile_publicschema_mapping(mapping_yaml)
@@ -512,14 +512,14 @@ out = rt.evaluate_publicschema_mapping(compiled, source_data, direction="odk->pr
 TypeScript/WASM:
 
 ```ts
-const mapper = await CelMapper.create();
+const mapper = await Crosswalk.create();
 const out = mapper.evaluatePublicSchemaMapping(mappingYaml, sourceData, {
   direction: "fieldbridge-odk->profile",
   includeResolvedValues: true,
 });
 ```
 
-The PublicSchema APIs SHOULD initially live on the same public `MappingRuntime` / `CelMapper` wrapper for ergonomics, backed internally by a `publicschema` module. A separate crate is deferred; see package structure.
+The PublicSchema APIs SHOULD initially live on the same public `MappingRuntime` / `Crosswalk` wrapper for ergonomics, backed internally by a `publicschema` module. A separate crate is deferred; see package structure.
 
 PublicSchema mapping documents MAY be supplied as YAML or JSON. The runtime detects the format by the first non-whitespace character: `{` or `[` means JSON; anything else is parsed as YAML.
 
@@ -545,7 +545,7 @@ For Phase 1, `available directions` and `expression count` are advisory and MAY 
 
 ```text
 sha256(canonical_json({
-  "schema": "cel-mapping-publicschema-v0.2",
+  "schema": "crosswalk-publicschema-v0.2",
   "mapping_id": id,
   "version": version,
   "source": source,
@@ -562,7 +562,7 @@ If a binding cannot produce canonical JSON in Phase 1, it MUST label the hash as
 
 ## 12. PublicSchema Build Integration
 
-`publicschema-build` should use `cel-mapping` for:
+`publicschema-build` should use `crosswalk` for:
 
 - CEL expression compilation.
 - Mapping formula diagnostics.
@@ -570,7 +570,7 @@ If a binding cannot produce canonical JSON in Phase 1, it MUST label the hash as
 - Optional deterministic compiled mapping artifacts.
 - Generated validator runtime dependencies.
 
-The existing `build.cel.env` and `build.cel.typecheck` APIs MAY remain as compatibility facades, but they should delegate to `cel-mapping`.
+The existing `build.cel.env` and `build.cel.typecheck` APIs MAY remain as compatibility facades, but they should delegate to `crosswalk`.
 
 Generated artifacts SHOULD include the canonical PublicSchema mapping JSON/YAML plus, optionally:
 
@@ -586,7 +586,7 @@ Phase 3 MUST NOT ship until deterministic hashing is implemented or explicitly m
 
 ## 13. Hosted PublicSchema Integration
 
-`publicschema.com/apps/core` should use `cel-mapping` for:
+`publicschema.com/apps/core` should use `crosswalk` for:
 
 - `/v1/transform/...`
 - mapping test endpoint
@@ -598,7 +598,7 @@ The hosted worker should not use `celpy` for PublicSchema mapping transforms aft
 
 The hosted worker should preserve current API response compatibility where possible.
 
-Before Phase 4 starts, the project MUST produce a written behavioral diff between the current `celpy` transform path and `cel-mapping`. The diff MUST cover:
+Before Phase 4 starts, the project MUST produce a written behavioral diff between the current `celpy` transform path and `crosswalk`. The diff MUST cover:
 
 - missing-field semantics
 - `null` vs missing behavior
@@ -631,7 +631,7 @@ privacy = production
 
 Phase 4 rollout MUST include a feature flag and rollback path:
 
-- shadow-run `cel-mapping` beside the current runtime where feasible
+- shadow-run `crosswalk` beside the current runtime where feasible
 - compare canonical outputs and diagnostics against parity fixtures
 - flip production traffic only after parity gates pass
 - retain the feature flag until generated validators and hosted runtime share the same engine
@@ -698,7 +698,7 @@ Generated JS validator parity is deferred until Phase 6; it MUST NOT block Phase
 Initial internal structure:
 
 ```text
-crates/cel-mapper-core/src/publicschema
+crates/crosswalk-core/src/publicschema
   PublicSchema mapping document model
   property_mappings compiler
   directional formula selection
@@ -706,31 +706,31 @@ crates/cel-mapper-core/src/publicschema
   compatibility bindings
 ```
 
-PublicSchema mode starts as a module inside `cel-mapper-core`.
+PublicSchema mode starts as a module inside `crosswalk-core`.
 
 A separate crate is deferred until after Phase 4, when the hosted runtime has migrated and the API boundary is proven.
 
 Possible future split:
 
 ```text
-crates/cel-mapper-core
+crates/crosswalk-core
   generic CEL evaluation
   JSON value conversion
   JSON Pointer read/write
   diagnostics
   security limits
 
-crates/cel-mapper-publicschema
+crates/crosswalk-publicschema
   PublicSchema mapping document model
   property_mappings compiler
   directional formula selection
   PublicSchema transform logs
   compatibility bindings
 
-crates/cel-mapper-wasm
+crates/crosswalk-wasm
   WASM API over both generic and PublicSchema APIs
 
-crates/cel-mapper-python
+crates/crosswalk-python
   Python API over both generic and PublicSchema APIs
 
 packages/js
@@ -810,7 +810,7 @@ Porting current PublicSchema `celext v1` helpers to Rust is a Phase 0 prerequisi
 - Produce the hosted `celpy` behavioral diff.
 - Decide deterministic-hash implementation status for generated artifacts.
 
-### Phase 1: PublicSchema mode in `cel-mapping`
+### Phase 1: PublicSchema mode in `crosswalk`
 
 - Add PublicSchema document structs.
 - Add JSON Pointer read/write module if not already sufficient.
@@ -829,7 +829,7 @@ Porting current PublicSchema `celext v1` helpers to Rust is a Phase 0 prerequisi
 
 ### Phase 3: `publicschema-build`
 
-- Delegate compile/typecheck to `cel-mapping`.
+- Delegate compile/typecheck to `crosswalk`.
 - Keep existing Python facade types for compatibility.
 - Generate canonical mapping artifacts plus optional compiled manifests.
 
@@ -843,7 +843,7 @@ Porting current PublicSchema `celext v1` helpers to Rust is a Phase 0 prerequisi
 
 ### Phase 5: Generated Python validators
 
-- Replace emitted `celpy` transform logic with `cel_mapper`.
+- Replace emitted `celpy` transform logic with `crosswalk`.
 - Keep fail-closed behavior.
 - Add package dependency and wheel strategy covering at least Linux x86_64, Linux ARM64, macOS ARM64/x86_64, and the supported Python minor versions.
 

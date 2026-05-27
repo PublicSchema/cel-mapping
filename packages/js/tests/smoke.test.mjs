@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  CelMapper,
+  Crosswalk,
   parseEvaluateExpressionJson,
   parsePreviewExpressionJson,
 } from "../dist/index.js";
@@ -29,9 +29,9 @@ test("parses low-level JSON responses", () => {
 
 test("initializes generated WASM and exercises the public wrapper", async () => {
   const wasmBytes = await readFile(
-    new URL("../wasm-pkg/cel_mapper_wasm_bg.wasm", import.meta.url)
+    new URL("../wasm-pkg/crosswalk_wasm_bg.wasm", import.meta.url)
   );
-  const mapper = await CelMapper.create({ module_or_path: wasmBytes });
+  const mapper = await Crosswalk.create({ module_or_path: wasmBytes });
 
   assert.deepEqual(mapper.evaluateExpression("source.name", { name: "Ada" }), {
     ok: true,

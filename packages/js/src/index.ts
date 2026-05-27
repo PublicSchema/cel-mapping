@@ -1,26 +1,26 @@
 /**
- * TypeScript entry for `cel-mapper-wasm` (web target).
+ * TypeScript entry for `crosswalk-wasm` (web target).
  *
- * **Idiomatic surface:** {@link CelMapper} — `await CelMapper.create()`, camelCase helpers, objects in / parsed JSON out.
+ * **Idiomatic surface:** {@link Crosswalk} — `await Crosswalk.create()`, camelCase helpers, objects in / parsed JSON out.
  *
- * **Low-level surface:** {@link init}, {@link CelMapperWasm}, {@link WasmMappingRuntime} — snake_case methods matching Rust
+ * **Low-level surface:** {@link init}, {@link CrosswalkWasm}, {@link WasmMappingRuntime} — snake_case methods matching Rust
  * (`evaluate_json`, `evaluate_expression_json`, …) and JSON **strings** for wasm interop.
  *
  * Build: `npm run build:wasm` then `npm run build:ts` (see `README.md` in this package).
  */
 
-import wasmInit, * as CelMapperWasm from "../wasm-pkg/cel_mapper_wasm.js";
+import wasmInit, * as CrosswalkWasm from "../wasm-pkg/crosswalk_wasm.js";
 
-export type { WasmMappingRuntime, InitInput } from "../wasm-pkg/cel_mapper_wasm.js";
+export type { WasmMappingRuntime, InitInput } from "../wasm-pkg/crosswalk_wasm.js";
 
 /** Initialize WebAssembly (required once per page before using the runtime). */
 export async function init(
-  moduleOrPath?: CelMapperWasm.InitInput | Promise<CelMapperWasm.InitInput>
+  moduleOrPath?: CrosswalkWasm.InitInput | Promise<CrosswalkWasm.InitInput>
 ): Promise<void> {
   await wasmInit(moduleOrPath);
 }
 
-export { CelMapperWasm };
+export { CrosswalkWasm };
 
 // --- JSON shapes returned by `WasmMappingRuntime` string methods (matches `serde_json` / core types) ---
 
@@ -70,7 +70,7 @@ export function parsePreviewExpressionJson(json: string): ExpressionPreviewJson 
   return JSON.parse(json) as ExpressionPreviewJson;
 }
 
-/** Full mapping evaluation JSON (`evaluate_json` / {@link CelMapper.evaluate}). */
+/** Full mapping evaluation JSON (`evaluate_json` / {@link Crosswalk.evaluate}). */
 export interface MappingEvaluationResult {
   records: Record<string, unknown[]>;
   warnings: unknown[];
@@ -162,7 +162,7 @@ export interface PublicSchemaHelperMetadata {
   helpers: Array<{ name: string; [key: string]: unknown }>;
 }
 
-type PublicSchemaWasmRuntime = CelMapperWasm.WasmMappingRuntime & {
+type PublicSchemaWasmRuntime = CrosswalkWasm.WasmMappingRuntime & {
   compile_publicschema_mapping_meta(mapping: string): string;
   evaluate_publicschema_json(
     mapping: string,
@@ -213,12 +213,12 @@ function parsePublicSchemaCompileMeta(raw: string): PublicSchemaCompileMeta {
  * Ergonomic wrapper around {@link WasmMappingRuntime}: camelCase methods, `unknown` / objects for payloads,
  * parsed results (no manual `JSON.parse` for common flows). Throws on invalid limits / runtime options / compile meta.
  *
- * Prefer **`await CelMapper.create()`** in apps; use {@link CelMapper.wasm} when you need snake_case JSON strings.
+ * Prefer **`await Crosswalk.create()`** in apps; use {@link Crosswalk.wasm} when you need snake_case JSON strings.
  */
-export class CelMapper {
-  readonly #rt: CelMapperWasm.WasmMappingRuntime;
+export class Crosswalk {
+  readonly #rt: CrosswalkWasm.WasmMappingRuntime;
 
-  private constructor(rt: CelMapperWasm.WasmMappingRuntime) {
+  private constructor(rt: CrosswalkWasm.WasmMappingRuntime) {
     this.#rt = rt;
   }
 
@@ -227,10 +227,10 @@ export class CelMapper {
    * from a non-default URL (see wasm-bindgen web docs).
    */
   static async create(
-    initInput?: CelMapperWasm.InitInput | Promise<CelMapperWasm.InitInput>
-  ): Promise<CelMapper> {
+    initInput?: CrosswalkWasm.InitInput | Promise<CrosswalkWasm.InitInput>
+  ): Promise<Crosswalk> {
     await wasmInit(initInput);
-    return new CelMapper(new CelMapperWasm.WasmMappingRuntime());
+    return new Crosswalk(new CrosswalkWasm.WasmMappingRuntime());
   }
 
   /** @throws if JSON does not match `SecurityLimits` */
@@ -356,7 +356,7 @@ export class CelMapper {
   }
 
   /** Underlying wasm-bindgen type (snake_case, JSON strings). */
-  get wasm(): CelMapperWasm.WasmMappingRuntime {
+  get wasm(): CrosswalkWasm.WasmMappingRuntime {
     return this.#rt;
   }
 }

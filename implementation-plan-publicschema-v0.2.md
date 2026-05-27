@@ -2,12 +2,12 @@
 
 Status: draft  
 Spec: [`spec-publicschema-v0.2.md`](./spec-publicschema-v0.2.md)  
-Primary goal: make `cel-mapping` the canonical PublicSchema transform runtime without breaking the existing v0.1 `records` API.
+Primary goal: make `crosswalk` the canonical PublicSchema transform runtime without breaking the existing v0.1 `records` API.
 
 ## 1. Operating Principles
 
 - Implement PublicSchema mode as an additive path.
-- Start inside `cel_mapper_core::publicschema`; defer a separate crate until after hosted runtime migration.
+- Start inside `crosswalk_core::publicschema`; defer a separate crate until after hosted runtime migration.
 - Expose Rust, Python, and WASM/TypeScript APIs in Phase 1, because Workbench preview depends on WASM and `publicschema-build` / generated Python validators depend on Python.
 - Treat Rust core as the behavioral oracle.
 - Port helper behavior before claiming parity.
@@ -58,7 +58,7 @@ Hosted runtime migration cannot start until:
 Create:
 
 ```text
-crates/cel-mapper-core/tests/publicschema_parity.rs
+crates/crosswalk-core/tests/publicschema_parity.rs
 tests/fixtures/publicschema-parity/*.json
 ```
 
@@ -109,8 +109,8 @@ Acceptance:
 Create:
 
 ```text
-crates/cel-mapper-core/src/functions/publicschema.rs
-crates/cel-mapper-core/tests/publicschema_helpers.rs
+crates/crosswalk-core/src/functions/publicschema.rs
+crates/crosswalk-core/tests/publicschema_helpers.rs
 docs/publicschema-helper-parity.md
 ```
 
@@ -168,21 +168,21 @@ Acceptance:
 Create:
 
 ```text
-crates/cel-mapper-core/src/publicschema/mod.rs
-crates/cel-mapper-core/src/publicschema/document.rs
-crates/cel-mapper-core/src/publicschema/compile.rs
-crates/cel-mapper-core/src/publicschema/evaluate.rs
-crates/cel-mapper-core/src/publicschema/pointer.rs
-crates/cel-mapper-core/src/publicschema/bindings.rs
-crates/cel-mapper-core/src/publicschema/output.rs
-crates/cel-mapper-core/src/publicschema/hash.rs
+crates/crosswalk-core/src/publicschema/mod.rs
+crates/crosswalk-core/src/publicschema/document.rs
+crates/crosswalk-core/src/publicschema/compile.rs
+crates/crosswalk-core/src/publicschema/evaluate.rs
+crates/crosswalk-core/src/publicschema/pointer.rs
+crates/crosswalk-core/src/publicschema/bindings.rs
+crates/crosswalk-core/src/publicschema/output.rs
+crates/crosswalk-core/src/publicschema/hash.rs
 ```
 
 Update:
 
 ```text
-crates/cel-mapper-core/src/lib.rs
-crates/cel-mapper-core/src/runtime.rs
+crates/crosswalk-core/src/lib.rs
+crates/crosswalk-core/src/runtime.rs
 ```
 
 Public API types:
@@ -330,10 +330,10 @@ Acceptance:
 Update:
 
 ```text
-crates/cel-mapper-python/src/lib.rs
-crates/cel-mapper-python/python/cel_mapper/__init__.pyi
-crates/cel-mapper-python/tests/test_publicschema.py
-crates/cel-mapper-python/examples/publicschema_transform.py
+crates/crosswalk-python/src/lib.rs
+crates/crosswalk-python/python/crosswalk/__init__.pyi
+crates/crosswalk-python/tests/test_publicschema.py
+crates/crosswalk-python/examples/publicschema_transform.py
 ```
 
 Expose:
@@ -354,7 +354,7 @@ Acceptance:
 Update:
 
 ```text
-crates/cel-mapper-wasm/src/lib.rs
+crates/crosswalk-wasm/src/lib.rs
 packages/js/src/index.ts
 packages/js/README.md
 ```
@@ -398,7 +398,7 @@ Target repo:
 
 Work:
 
-- Add local dependency on `cel-mapping-js`.
+- Add local dependency on `crosswalk-js`.
 - Configure Next/Vite handling for WASM asset.
 - Add client-side runtime loader.
 - Use `previewPublicSchemaRuleExpression` in CEL formula editor.
@@ -433,8 +433,8 @@ Target repo:
 
 Work:
 
-- Add Python dependency on `cel-mapping`.
-- Replace `build.cel.env` internals with `cel_mapper` facade while preserving public classes.
+- Add Python dependency on `crosswalk`.
+- Replace `build.cel.env` internals with `crosswalk` facade while preserving public classes.
 - Replace or supplement `build.cel.typecheck`.
 - Generate PublicSchema mapping artifacts compatible with the new runtime.
 - Include `mapping_hash`, helper registry version, and referenced paths.
@@ -469,9 +469,9 @@ Target repo:
 
 Work:
 
-- Add `cel-mapping` Python dependency.
-- Add feature flag, e.g. `PUBLICSCHEMA_TRANSFORM_RUNTIME=celpy|cel-mapping|shadow`.
-- Implement adapter from hosted bundle shape to `cel_mapper` inputs.
+- Add `crosswalk` Python dependency.
+- Add feature flag, e.g. `PUBLICSCHEMA_TRANSFORM_RUNTIME=celpy|crosswalk|shadow`.
+- Implement adapter from hosted bundle shape to `crosswalk` inputs.
 - Wire code-system registries from profile bundles.
 - Replace transform execution path behind flag.
 - Shadow-run and compare in non-production.
@@ -505,7 +505,7 @@ Target repo:
 
 Work:
 
-- Update generated Python validator templates to depend on `cel-mapping`.
+- Update generated Python validator templates to depend on `crosswalk`.
 - Replace emitted `celpy` transform logic.
 - Package mapping artifacts and code registries.
 - Define wheel/release matrix.
@@ -549,9 +549,9 @@ Acceptance:
 Run after Phase 1:
 
 ```bash
-cargo test -p cel-mapper-core -p cel-mapper-wasm
+cargo test -p crosswalk-core -p crosswalk-wasm
 cd packages/js && npm run build:wasm && npm run build:ts
-cd crates/cel-mapper-python && pytest -q
+cd crates/crosswalk-python && pytest -q
 ```
 
 Run after Phase 3:
