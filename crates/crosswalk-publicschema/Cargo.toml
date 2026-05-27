@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "PublicSchema v0.2 mapping compile and evaluation runtime"
+readme = "README.md"
 
 [dependencies]
 crosswalk-cel = { path = "../crosswalk-cel" }
@@ -16,4 +17,3 @@ serde_yaml = "0.9"
 sha2 = "0.10"
 hex = "0.4"
 thiserror = "1"
-

@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Standalone CEL evaluation boundary for crosswalk"
+readme = "README.md"
 
 [dependencies]
 cel = { version = "0.13", features = ["json", "chrono", "regex"] }

@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Pure deterministic mapping helper functions"
+readme = "README.md"
 
 [features]
 default = ["std", "text", "regex", "email", "ids", "json", "codes"]

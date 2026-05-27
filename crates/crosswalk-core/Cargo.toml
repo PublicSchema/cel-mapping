@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "CEL-based declarative mapping runtime (spec v0.1)"
+readme = "README.md"
 
 [dependencies]
 cel = { version = "0.13", features = ["json", "chrono", "regex"] }

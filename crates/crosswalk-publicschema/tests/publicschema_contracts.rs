@@ -113,8 +113,10 @@ property_mappings:
 
 #[test]
 fn direct_publicschema_evaluate_does_not_install_function_budget_guard() {
-    let mut limits = SecurityLimits::default();
-    limits.max_string_bytes = 1;
+    let limits = SecurityLimits {
+        max_string_bytes: 1,
+        ..Default::default()
+    };
     let compiled = compile(
         r#"
 version: "0.2"

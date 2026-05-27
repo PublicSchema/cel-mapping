@@ -10,23 +10,60 @@ For the proposed crate-boundary refactor and reusable helper-function crates, se
 
 Phase 0 gate documents: **[`docs/publicschema-helper-parity.md`](./docs/publicschema-helper-parity.md)** (celext v1 helper inventory and Rust porting status) and **[`docs/publicschema-celpy-behavioral-diff.md`](./docs/publicschema-celpy-behavioral-diff.md)** (celpy behavioral diff template, to be filled before Phase 4).
 
+## Which package should I use?
+
+Most Rust application code should start with **`crosswalk-core`**. Use the
+lower-level crates only when you need their narrower boundary.
+
+| Need | Use |
+|------|-----|
+| Compile and evaluate v0.1 mapping YAML in Rust | [`crosswalk-core`](./crates/crosswalk-core/README.md) |
+| Evaluate or preview standalone CEL expressions | [`crosswalk-cel`](./crates/crosswalk-cel/README.md) |
+| Call deterministic helper functions without CEL | [`crosswalk-functions`](./crates/crosswalk-functions/README.md) |
+| Register helper functions into a CEL context | [`crosswalk-functions-cel`](./crates/crosswalk-functions-cel/README.md) |
+| Compile and evaluate PublicSchema v0.2 mappings | [`crosswalk-publicschema`](./crates/crosswalk-publicschema/README.md) or the facade in `crosswalk-core` |
+| Use Crosswalk from Python | [`crosswalk`](./crates/crosswalk-python/README.md) |
+| Use Crosswalk from browser or TypeScript | [`crosswalk-js`](./packages/js/README.md) backed by [`crosswalk-wasm`](./crates/crosswalk-wasm/README.md) |
+
+## Documentation map
+
+| Document | Purpose |
+|----------|---------|
+| [`docs/architecture.md`](./docs/architecture.md) | Crate ownership, dependency direction, and boundary rules |
+| [`docs/extension-guide.md`](./docs/extension-guide.md) | How to add helpers, CEL behavior, PublicSchema behavior, or bindings without breaking boundaries |
+| [`docs/release-checklist.md`](./docs/release-checklist.md) | Pre-release checks for Rust crates, Python wheels, and JS/WASM package output |
+| [`docs/crate-split-inventory.md`](./docs/crate-split-inventory.md) | v0.3 split inventory, preserved pitfalls, and public re-export paths |
+
 ## Layout
 
 | Path | Role |
 |------|------|
-| [`crates/crosswalk-functions`](./crates/crosswalk-functions) | Pure deterministic helper functions, typed code-system registry, and ISO preload data with no CEL dependency |
-| [`crates/crosswalk-functions-cel`](./crates/crosswalk-functions-cel) | CEL adapter: helper registration, CEL value coercion, helper metadata, and request fallback resolution |
-| [`crates/crosswalk-cel`](./crates/crosswalk-cel) | Standalone CEL compile/evaluate/preview boundary, expression diagnostics, security limits, and helper registration |
-| [`crates/crosswalk-publicschema`](./crates/crosswalk-publicschema) | PublicSchema v0.2 property-mapping compile/evaluate runtime, JSON Pointer writes, hashes, logs, and privacy diagnostics |
-| [`crates/crosswalk-core`](./crates/crosswalk-core) | Compatibility facade and v0.1 records mapping runtime |
-| [`crates/crosswalk-wasm`](./crates/crosswalk-wasm) | `wasm-bindgen` wrapper (JSON string API) |
-| [`crates/crosswalk-python`](./crates/crosswalk-python) | PyO3 extension `crosswalk` + [`examples/`](./crates/crosswalk-python/examples/) |
+| [`crates/crosswalk-functions`](./crates/crosswalk-functions/README.md) | Pure deterministic helper functions, typed code-system registry, and ISO preload data with no CEL dependency |
+| [`crates/crosswalk-functions-cel`](./crates/crosswalk-functions-cel/README.md) | CEL adapter: helper registration, CEL value coercion, helper metadata, and request fallback resolution |
+| [`crates/crosswalk-cel`](./crates/crosswalk-cel/README.md) | Standalone CEL compile/evaluate/preview boundary, expression diagnostics, security limits, and helper registration |
+| [`crates/crosswalk-publicschema`](./crates/crosswalk-publicschema/README.md) | PublicSchema v0.2 property-mapping compile/evaluate runtime, JSON Pointer writes, hashes, logs, and privacy diagnostics |
+| [`crates/crosswalk-core`](./crates/crosswalk-core/README.md) | Compatibility facade and v0.1 records mapping runtime |
+| [`crates/crosswalk-wasm`](./crates/crosswalk-wasm/README.md) | `wasm-bindgen` wrapper (JSON string API) |
+| [`crates/crosswalk-python`](./crates/crosswalk-python/README.md) | PyO3 extension `crosswalk` + [`examples/`](./crates/crosswalk-python/examples/) |
 | [`packages/js`](./packages/js) | TypeScript + `wasm-pack` script targeting `wasm-pkg/` |
 | [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | `fmt` / `clippy` / tests, WASM build + TS, `maturin` + `pytest` + examples |
 
 Workspace `default-members` include the reusable split crates, core, and WASM so `cargo test` exercises the Rust runtime without requiring Python dev libraries. The Python crate remains a workspace member for `cargo test -p crosswalk-python` (cdylib-only; use **`pytest`** after `maturin develop`).
 
 Compatibility import paths remain available through **`crosswalk_core`** during the migration. New Rust consumers can import pure helpers from **`crosswalk_functions`**, standalone expression APIs from **`crosswalk_cel`**, PublicSchema runtime types from **`crosswalk_publicschema`**, and CEL helper registration/metadata from **`crosswalk_functions_cel`**.
+
+## Workspace verification
+
+```bash
+cargo fmt --all -- --check
+cargo clippy -p crosswalk-core -p crosswalk-wasm --all-targets -- -D warnings
+cargo test --workspace
+cargo doc --workspace --no-deps
+```
+
+Python and JS/WASM have additional package-level checks documented in
+[`crates/crosswalk-python/README.md`](./crates/crosswalk-python/README.md) and
+[`packages/js/README.md`](./packages/js/README.md).
 
 ## Quick start (Rust)
 
@@ -47,8 +84,8 @@ let out = rt.evaluate(&compiled, EvaluationInput { source, context });
 
 ### Standalone expression (no mapping YAML)
 
-- **`evaluate_cel_expression`** / **`MappingRuntime::evaluate_cel_expression`** — same bindings as a field expression (`source`, `ctx`, stdlib); takes **`EvaluationInput`**; returns `Result<JsonValue, StandaloneEvalError>`.
-- **`preview_cel_expression`** / **`MappingRuntime::preview_cel_expression`** — **editor-oriented**: same `expr` + **`EvaluationInput`**; always returns **`ExpressionPreviewResult`** with `author_expression`, optional `rewritten_expression`, `value`, `issues` (syntax uses CEL’s full diagnostic + line/column in the **rewritten** buffer), and `notes` for tools/LLMs.
+- **`evaluate_cel_expression`** / **`MappingRuntime::evaluate_cel_expression`**: same bindings as a field expression (`source`, `ctx`, stdlib); takes **`EvaluationInput`**; returns `Result<JsonValue, StandaloneEvalError>`.
+- **`preview_cel_expression`** / **`MappingRuntime::preview_cel_expression`**: **editor-oriented**: same `expr` + **`EvaluationInput`**; always returns **`ExpressionPreviewResult`** with `author_expression`, optional `rewritten_expression`, `value`, `issues` (syntax uses CEL’s full diagnostic + line/column in the **rewritten** buffer), and `notes` for tools/LLMs.
 
 The crate-root free functions **`crosswalk_core::evaluator::evaluate_cel_expression`** / **`preview_cel_expression`** take raw `source` / `ctx` JSON plus `SecurityLimits` and a code-system registry for lower-level use.
 
